@@ -1,5 +1,6 @@
 package com.spendify.backend.entity;
 
+import com.spendify.backend.entity.RefreshToken;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -25,5 +26,8 @@ public class User {
 
     @Column(nullable = false)
     private String password;
+
+    @OneToOne(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    private RefreshToken refreshToken;
 
 }

@@ -115,13 +115,12 @@ public class AuthService {
     }
 
     private RefreshToken createRefreshToken(User user) {
-        refreshTokenRepository.findByUserId(user.getId()).ifPresent(refreshTokenRepository::delete);
         var refreshToken = RefreshToken.builder()
                 .user(user)
                 .token(UUID.randomUUID().toString())
                 .expiryDate(LocalDateTime.now().plusDays(7))
                 .build();
-        refreshTokenRepository.save(refreshToken);
+        user.setRefreshToken(refreshToken);
         return refreshToken;
     }
 }
