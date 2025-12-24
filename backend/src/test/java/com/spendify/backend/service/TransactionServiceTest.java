@@ -342,5 +342,133 @@ class TransactionServiceTest {
                 .isInstanceOf(UnauthorizedException.class)
                 .hasMessage("User not authorized for this category");
     }
+
+    @Test
+    void deleteTransaction_whenTransactionExistsAndBelongsToUser_shouldSoftDelete() {
+        // Given
+        mockCurrentUser();
+        Long transactionId = 1L;
+        Transaction existingTransaction = Transaction.builder()
+                .id(transactionId)
+                .user(currentUser)
+                .isDeleted(false) // Initially not deleted
+                .build();
+        
+        when(transactionRepository.findById(transactionId)).thenReturn(Optional.of(existingTransaction));
+
+        // When
+        transactionService.deleteTransaction(transactionId);
+
+        // Then
+        verify(transactionRepository).save(argThat(transaction ->
+                transaction.getId().equals(transactionId) &&
+                transaction.isDeleted() && // Should now be deleted
+                transaction.getDeletedDate() != null
+        ));
+    }
+
+    @Test
+    void deleteTransaction_whenTransactionBelongsToAnotherUser_shouldThrowUnauthorizedException() {
+        // Given
+        mockCurrentUser();
+        Long transactionId = 1L;
+        Transaction otherUserTransaction = Transaction.builder().id(transactionId).user(otherUser).build();
+        when(transactionRepository.findById(transactionId)).thenReturn(Optional.of(otherUserTransaction));
+
+        // When & Then
+        assertThatThrownBy(() -> transactionService.deleteTransaction(transactionId))
+                .isInstanceOf(UnauthorizedException.class);
+        
+        verify(transactionRepository, never()).save(any());
+    }
+
+    @Test
+    void undoDeleteTransaction_whenRecentlyDeleted_shouldRestoreTransaction() {
+        // Given
+        mockCurrentUser();
+        Long transactionId = 1L;
+        Transaction deletedTransaction = Transaction.builder()
+                .id(transactionId)
+                .user(currentUser)
+                .isDeleted(true)
+                .deletedDate(java.time.LocalDateTime.now().minusSeconds(5)) // Deleted 5 seconds ago
+                .category(userOwnedCategory)
+                .build();
+
+        when(transactionRepository.findByIdIncludingDeleted(transactionId)).thenReturn(Optional.of(deletedTransaction));
+        when(transactionRepository.save(any(Transaction.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+
+        // When
+        TransactionResponse response = transactionService.undoDeleteTransaction(transactionId);
+
+        // Then
+        assertThat(response).isNotNull();
+        verify(transactionRepository).save(argThat(transaction ->
+                transaction.getId().equals(transactionId) &&
+                !transaction.isDeleted() && // Should be restored
+                transaction.getDeletedDate() == null
+        ));
+    }
+    
+    @Test
+    void undoDeleteTransaction_whenNotRecentlyDeleted_shouldThrowException() {
+        // Given
+        mockCurrentUser();
+        Long transactionId = 1L;
+        Transaction deletedTransaction = Transaction.builder()
+                .id(transactionId)
+                .user(currentUser)
+                .isDeleted(true)
+                .deletedDate(java.time.LocalDateTime.now().minusSeconds(15)) // Deleted 15 seconds ago
+                .build();
+        
+        when(transactionRepository.findByIdIncludingDeleted(transactionId)).thenReturn(Optional.of(deletedTransaction));
+
+        // When & Then
+        assertThatThrownBy(() -> transactionService.undoDeleteTransaction(transactionId))
+                .isInstanceOf(UnsupportedOperationException.class)
+                .hasMessage("Undo delete is not available for this transaction.");
+    }
+    
+    @Test
+    void undoDeleteTransaction_whenTransactionIsNotDeleted_shouldThrowException() {
+        // Given
+        mockCurrentUser();
+        Long transactionId = 1L;
+        Transaction activeTransaction = Transaction.builder()
+                .id(transactionId)
+                .user(currentUser)
+                .isDeleted(false) // Not deleted
+                .build();
+
+        when(transactionRepository.findByIdIncludingDeleted(transactionId)).thenReturn(Optional.of(activeTransaction));
+        
+        // When & Then
+        assertThatThrownBy(() -> transactionService.undoDeleteTransaction(transactionId))
+                .isInstanceOf(UnsupportedOperationException.class)
+                .hasMessage("Undo delete is not available for this transaction.");
+    }
+    
+    @Test
+    void undoDeleteTransaction_whenNotAuthorized_shouldThrowException() {
+        // Given
+        mockCurrentUser();
+        Long transactionId = 1L;
+        Transaction otherUserDeletedTransaction = Transaction.builder()
+                .id(transactionId)
+                .user(otherUser) // Belongs to other user
+                .isDeleted(true)
+                .deletedDate(java.time.LocalDateTime.now().minusSeconds(5))
+                .build();
+        
+        when(transactionRepository.findByIdIncludingDeleted(transactionId)).thenReturn(Optional.of(otherUserDeletedTransaction));
+
+        // When & Then
+        assertThatThrownBy(() -> transactionService.undoDeleteTransaction(transactionId))
+                .isInstanceOf(UnauthorizedException.class)
+                .hasMessage("User not authorized for this transaction");
+    }
 }
+
 
