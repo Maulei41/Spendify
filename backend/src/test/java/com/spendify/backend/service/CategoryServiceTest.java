@@ -2,8 +2,10 @@ package com.spendify.backend.service;
 
 import com.spendify.backend.dto.CategoryResponse;
 import com.spendify.backend.dto.CreateCategoryRequest;
+import com.spendify.backend.dto.UpdateCategoryRequest;
 import com.spendify.backend.entity.Category;
 import com.spendify.backend.entity.User;
+import com.spendify.backend.exception.ResourceNotFoundException;
 import com.spendify.backend.repository.CategoryRepository;
 import com.spendify.backend.repository.TransactionRepository;
 import com.spendify.backend.repository.UserRepository;
@@ -17,6 +19,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -118,5 +121,132 @@ class CategoryServiceTest {
 
         // Verify that the save method was never called
         verify(categoryRepository, never()).save(any(Category.class));
+    }
+
+    @Test
+    void getAllCategories_shouldReturnUserAndSystemCategories() {
+        // Given
+        User testUser = new User();
+        testUser.setId(1L);
+        when(authentication.getName()).thenReturn("test@example.com");
+        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(testUser));
+
+        Category userCategory = Category.builder().id(101L).name("Personal").user(testUser).isSystem(false).build();
+        Category systemCategory = Category.builder().id(201L).name("Food").user(null).isSystem(true).build();
+
+        when(categoryRepository.findByUserIdOrIsSystem(1L, true)).thenReturn(List.of(userCategory, systemCategory));
+        when(transactionRepository.countByCategoryId(anyLong())).thenReturn(0L); // Assume 0 for simplicity
+
+        // When
+        List<CategoryResponse> categories = categoryService.getAllCategories();
+
+        // Then
+        assertThat(categories).hasSize(2);
+        assertThat(categories).extracting(CategoryResponse::getName).contains("Personal", "Food");
+    }
+
+    @Test
+    void updateCategory_whenValid_shouldUpdateAndReturnCategory() {
+        // Given
+        User testUser = new User();
+        testUser.setId(1L);
+        when(authentication.getName()).thenReturn("test@example.com");
+        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(testUser));
+
+        Long categoryId = 101L;
+        Category existingCategory = Category.builder().id(categoryId).name("Old Name").user(testUser).isSystem(false).build();
+        UpdateCategoryRequest request = UpdateCategoryRequest.builder().name("New Name").build();
+
+        when(categoryRepository.findById(categoryId)).thenReturn(Optional.of(existingCategory));
+        when(categoryRepository.save(any(Category.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(transactionRepository.countByCategoryId(categoryId)).thenReturn(5L);
+
+        // When
+        CategoryResponse response = categoryService.updateCategory(categoryId, request);
+
+        // Then
+        assertThat(response.getName()).isEqualTo("New Name");
+        assertThat(response.getTransactionCount()).isEqualTo(5L);
+        verify(categoryRepository).save(argThat(cat -> cat.getName().equals("New Name")));
+    }
+
+    @Test
+    void updateCategory_whenCategoryNotFound_shouldThrowException() {
+        // Given
+        User testUser = new User();
+        testUser.setId(1L);
+        when(authentication.getName()).thenReturn("test@example.com");
+        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(testUser));
+
+        Long categoryId = 999L;
+        when(categoryRepository.findById(categoryId)).thenReturn(Optional.empty());
+
+        // When & Then
+        assertThatThrownBy(() -> categoryService.updateCategory(categoryId, new UpdateCategoryRequest()))
+                .isInstanceOf(ResourceNotFoundException.class);
+    }
+    
+    @Test
+    void updateCategory_whenUserNotAuthorized_shouldThrowException() {
+        // Given
+        User currentUser = new User();
+        currentUser.setId(1L);
+        User anotherUser = new User();
+        anotherUser.setId(2L);
+        when(authentication.getName()).thenReturn("test@example.com");
+        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(currentUser));
+
+        Long categoryId = 102L;
+        Category anotherUsersCategory = Category.builder().id(categoryId).name("Another User's").user(anotherUser).isSystem(false).build();
+
+        when(categoryRepository.findById(categoryId)).thenReturn(Optional.of(anotherUsersCategory));
+
+        // When & Then
+        assertThatThrownBy(() -> categoryService.updateCategory(categoryId, new UpdateCategoryRequest()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("User not authorized to update this category.");
+    }
+    
+    @Test
+    void updateCategory_whenUpdatingSystemCategory_shouldThrowException() {
+        // Given
+        User currentUser = new User();
+        currentUser.setId(1L);
+        when(authentication.getName()).thenReturn("test@example.com");
+        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(currentUser));
+
+        Long categoryId = 201L;
+        Category systemCategory = Category.builder().id(categoryId).name("System Cat").user(null).isSystem(true).build();
+
+        when(categoryRepository.findById(categoryId)).thenReturn(Optional.of(systemCategory));
+
+        // When & Then
+        assertThatThrownBy(() -> categoryService.updateCategory(categoryId, new UpdateCategoryRequest()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("User not authorized to update this category.");
+    }
+
+    @Test
+    void deleteCategory_withReassignId_shouldReassignTransactionsAndDelete() {
+        // Given
+        User currentUser = new User();
+        currentUser.setId(1L);
+        when(authentication.getName()).thenReturn("test@example.com");
+        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(currentUser));
+
+        Long categoryToDeleteId = 101L;
+        Long reassignCategoryId = 102L;
+        Category categoryToDelete = Category.builder().id(categoryToDeleteId).name("To Delete").user(currentUser).isSystem(false).build();
+        Category reassignCategory = Category.builder().id(reassignCategoryId).name("Reassign Here").user(currentUser).isSystem(false).build();
+
+        when(categoryRepository.findById(categoryToDeleteId)).thenReturn(Optional.of(categoryToDelete));
+        when(categoryRepository.findById(reassignCategoryId)).thenReturn(Optional.of(reassignCategory));
+
+        // When
+        categoryService.deleteCategory(categoryToDeleteId, reassignCategoryId);
+
+        // Then
+        verify(transactionRepository).reassignCategory(currentUser.getId(), categoryToDeleteId, reassignCategoryId);
+        verify(categoryRepository).delete(categoryToDelete);
     }
 }
