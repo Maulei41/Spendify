@@ -28,7 +28,10 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-          cache: maven  # cache Maven dependencies[web:69]
+          cache: maven
+
+      - name: Grant execute permissions to mvnw
+        run: chmod +x mvnw
 
       - name: Build and run tests
         run: ./mvnw -B clean test
