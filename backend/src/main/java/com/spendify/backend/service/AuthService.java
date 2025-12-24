@@ -85,7 +85,8 @@ public class AuthService {
     public UserResponse getCurrentUser() {
         org.springframework.security.core.Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String email = authentication.getName();
-        User user = userRepository.findByEmail(email).orElseThrow();
+                User user = userRepository.findByEmail(email)
+                        .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         return UserResponse.builder()
                 .id(user.getId())
                 .email(user.getEmail())
