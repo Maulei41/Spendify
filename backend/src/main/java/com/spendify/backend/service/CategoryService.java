@@ -7,9 +7,7 @@ import com.spendify.backend.entity.Category;
 import com.spendify.backend.entity.User;
 import com.spendify.backend.exception.DuplicateCategoryException;
 import com.spendify.backend.exception.ResourceNotFoundException;
-// ... (rest of the imports)
 
-// ... (inside createCategory method)
     @Transactional
     public CategoryResponse createCategory(CreateCategoryRequest request) {
         User user = getCurrentUser();
