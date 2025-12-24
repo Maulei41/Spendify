@@ -5,6 +5,7 @@ import com.spendify.backend.dto.CreateCategoryRequest;
 import com.spendify.backend.dto.UpdateCategoryRequest;
 import com.spendify.backend.entity.Category;
 import com.spendify.backend.entity.User;
+import com.spendify.backend.exception.DuplicateCategoryException;
 import com.spendify.backend.exception.ResourceNotFoundException;
 import com.spendify.backend.repository.CategoryRepository;
 import com.spendify.backend.repository.TransactionRepository;
@@ -38,7 +39,7 @@ public class CategoryService {
         User user = getCurrentUser();
         categoryRepository.findByNameAndUserId(request.getName(), user.getId())
                 .ifPresent(c -> {
-                    throw new IllegalStateException("Category with this name already exists.");
+                    throw new DuplicateCategoryException("Category with this name already exists.");
                 });
 
         Category category = Category.builder()

@@ -111,9 +111,9 @@ class CategoryServiceTest {
         when(userRepository.findByEmail(testUser.getEmail())).thenReturn(Optional.of(testUser));
         when(categoryRepository.findByNameAndUserId(request.getName(), testUser.getId())).thenReturn(Optional.of(existingCategory));
 
-        // When & Then: Calling createCategory should throw an IllegalStateException
+        // When & Then: Calling createCategory should throw a DuplicateCategoryException
         assertThatThrownBy(() -> categoryService.createCategory(request))
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOf(DuplicateCategoryException.class)
                 .hasMessage("Category with this name already exists.");
 
         // Verify that the save method was never called
