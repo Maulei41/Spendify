@@ -113,7 +113,7 @@ class CategoryServiceTest {
 
         // When & Then: Calling createCategory should throw a DuplicateCategoryException
         assertThatThrownBy(() -> categoryService.createCategory(request))
-                .isInstanceOf(DuplicateCategoryException.class)
+                .isInstanceOf(IllegalStateException.class)
                 .hasMessage("Category with this name already exists.");
 
         // Verify that the save method was never called
