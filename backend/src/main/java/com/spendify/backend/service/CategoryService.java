@@ -7,33 +7,9 @@ import com.spendify.backend.entity.Category;
 import com.spendify.backend.entity.User;
 import com.spendify.backend.exception.DuplicateCategoryException;
 import com.spendify.backend.exception.ResourceNotFoundException;
-import com.spendify.backend.repository.CategoryRepository;
-import com.spendify.backend.repository.TransactionRepository;
-import com.spendify.backend.repository.UserRepository;
-import lombok.RequiredArgsConstructor;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+// ... (rest of the imports)
 
-import java.util.List;
-import java.util.stream.Collectors;
-
-@Service
-@RequiredArgsConstructor
-public class CategoryService {
-
-    private final CategoryRepository categoryRepository;
-    private final UserRepository userRepository;
-    private final TransactionRepository transactionRepository;
-
-    public List<CategoryResponse> getAllCategories() {
-        User user = getCurrentUser();
-        return categoryRepository.findByUserIdOrIsSystem(user.getId(), true)
-                .stream()
-                .map(this::mapToCategoryResponse)
-                .collect(Collectors.toList());
-    }
-
+// ... (inside createCategory method)
     @Transactional
     public CategoryResponse createCategory(CreateCategoryRequest request) {
         User user = getCurrentUser();
