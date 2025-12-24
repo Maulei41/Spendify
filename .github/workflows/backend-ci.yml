@@ -31,4 +31,4 @@ jobs:
           cache: maven  # cache Maven dependencies[web:69]
 
       - name: Build and run tests
-        run: mvn -B clean test
+        run: ./mvnw -B clean test
