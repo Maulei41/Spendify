@@ -4,7 +4,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 
-class LoginAttemptServiceTest {
+class   LoginAttemptServiceTest {
 
     private LoginAttemptService loginAttemptService;
     private final String TEST_KEY = "test@user.com";
