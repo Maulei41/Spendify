@@ -2,12 +2,14 @@ package com.spendify.backend.service;
 
 import com.spendify.backend.dto.AuthenticationResponse;
 import com.spendify.backend.dto.LoginRequest;
+import com.spendify.backend.dto.RefreshTokenRequest;
 import com.spendify.backend.dto.RegisterRequest;
 import com.spendify.backend.entity.RefreshToken;
 import com.spendify.backend.entity.User;
 import com.spendify.backend.exception.AccountLockedException;
 import com.spendify.backend.exception.DuplicateEmailException;
 import com.spendify.backend.exception.InvalidCredentialsException;
+import com.spendify.backend.exception.ResourceNotFoundException;
 import com.spendify.backend.repository.RefreshTokenRepository;
 import com.spendify.backend.repository.UserRepository;
 import com.spendify.backend.security.JwtTokenProvider;
@@ -18,6 +20,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.LocalDateTime;
