@@ -2,6 +2,7 @@ package com.spendify.backend.service;
 
 import com.spendify.backend.dto.TransactionCreateRequest;
 import com.spendify.backend.dto.TransactionResponse;
+import com.spendify.backend.dto.TransactionUpdateRequest;
 import com.spendify.backend.entity.Category;
 import com.spendify.backend.entity.Transaction;
 import com.spendify.backend.entity.User;
@@ -129,7 +130,6 @@ class TransactionServiceTest {
         
         verify(transactionRepository, never()).save(any());
     }
-
     @Test
     void createTransaction_whenCategoryNotAuthorized_shouldThrowUnauthorizedException() {
         // Given
@@ -151,4 +151,196 @@ class TransactionServiceTest {
         
         verify(transactionRepository, never()).save(any());
     }
+
+    @Test
+    void getTransactionById_whenTransactionExistsAndBelongsToUser_shouldReturnTransactionResponse() {
+        // Given
+        mockCurrentUser();
+        Long transactionId = 1L;
+        Transaction existingTransaction = Transaction.builder()
+                .id(transactionId)
+                .amount(new BigDecimal("50.00"))
+                .transactionDate(LocalDate.now())
+                .category(userOwnedCategory)
+                .user(currentUser)
+                .merchant("Cafe")
+                .build();
+        when(transactionRepository.findById(transactionId)).thenReturn(Optional.of(existingTransaction));
+
+        // When
+        TransactionResponse response = transactionService.getTransactionById(transactionId);
+
+        // Then
+        assertThat(response).isNotNull();
+        assertThat(response.getId()).isEqualTo(transactionId);
+        assertThat(response.getAmount()).isEqualByComparingTo("50.00");
+        assertThat(response.getCategoryName()).isEqualTo(userOwnedCategory.getName());
+    }
+
+    @Test
+    void getTransactionById_whenTransactionNotFound_shouldThrowResourceNotFoundException() {
+        // Given
+        mockCurrentUser();
+        Long nonExistentTransactionId = 999L;
+        when(transactionRepository.findById(nonExistentTransactionId)).thenReturn(Optional.empty());
+
+        // When & Then
+        assertThatThrownBy(() -> transactionService.getTransactionById(nonExistentTransactionId))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessage("Transaction not found with id: " + nonExistentTransactionId);
+    }
+
+    @Test
+    void getTransactionById_whenTransactionBelongsToAnotherUser_shouldThrowUnauthorizedException() {
+        // Given
+        mockCurrentUser();
+        Long transactionId = 1L;
+        Transaction otherUserTransaction = Transaction.builder()
+                .id(transactionId)
+                .amount(new BigDecimal("25.00"))
+                .transactionDate(LocalDate.now())
+                .category(userOwnedCategory)
+                .user(otherUser) // Belongs to other user
+                .merchant("Cinema")
+                .build();
+        when(transactionRepository.findById(transactionId)).thenReturn(Optional.of(otherUserTransaction));
+
+        // When & Then
+        assertThatThrownBy(() -> transactionService.getTransactionById(transactionId))
+                .isInstanceOf(UnauthorizedException.class)
+                .hasMessage("User not authorized for this transaction");
+    }
+
+    @Test
+    void updateTransaction_whenDetailsAreValidAndTransactionBelongsToUser_shouldUpdateAndReturnTransaction() {
+        // Given
+        mockCurrentUser();
+        Long transactionId = 1L;
+        Transaction existingTransaction = Transaction.builder()
+                .id(transactionId)
+                .amount(new BigDecimal("50.00"))
+                .transactionDate(LocalDate.now().minusDays(1))
+                .category(userOwnedCategory)
+                .user(currentUser)
+                .merchant("Old Merchant")
+                .build();
+
+        Category newCategory = new Category();
+        newCategory.setId(11L);
+        newCategory.setName("Transport");
+        newCategory.setUser(currentUser);
+        newCategory.setSystem(false);
+
+        TransactionUpdateRequest updateRequest = TransactionUpdateRequest.builder()
+                .amount(new BigDecimal("75.00"))
+                .transactionDate(LocalDate.now())
+                .description("Updated desc")
+                .categoryId(newCategory.getId())
+                .merchant("New Merchant")
+                .build();
+        
+        Transaction updatedTransaction = Transaction.builder() // The expected saved transaction
+                .id(transactionId)
+                .amount(new BigDecimal("75.00"))
+                .transactionDate(LocalDate.now())
+                .description("Updated desc")
+                .category(newCategory)
+                .user(currentUser)
+                .merchant("New Merchant")
+                .build();
+
+
+        when(transactionRepository.findById(transactionId)).thenReturn(Optional.of(existingTransaction));
+        when(categoryRepository.findById(newCategory.getId())).thenReturn(Optional.of(newCategory));
+        when(transactionRepository.save(any(Transaction.class))).thenReturn(updatedTransaction); // Return the fully updated object
+
+        // When
+        TransactionResponse response = transactionService.updateTransaction(transactionId, updateRequest);
+
+        // Then
+        assertThat(response).isNotNull();
+        assertThat(response.getId()).isEqualTo(transactionId);
+        assertThat(response.getAmount()).isEqualByComparingTo("75.00");
+        assertThat(response.getMerchant()).isEqualTo("New Merchant");
+        assertThat(response.getCategoryName()).isEqualTo("Transport");
+        assertThat(response.getDescription()).isEqualTo("Updated desc");
+
+        verify(transactionRepository).save(argThat(tx -> 
+            tx.getId().equals(transactionId) &&
+            tx.getAmount().compareTo(new BigDecimal("75.00")) == 0 &&
+            tx.getCategory().getId().equals(newCategory.getId()) &&
+            tx.getDescription().equals("Updated desc") &&
+            tx.getMerchant().equals("New Merchant")
+        ));
+    }
+
+    @Test
+    void updateTransaction_whenTransactionNotFound_shouldThrowResourceNotFoundException() {
+        // Given
+        mockCurrentUser();
+        Long nonExistentTransactionId = 999L;
+        TransactionUpdateRequest updateRequest = new TransactionUpdateRequest();
+        when(transactionRepository.findById(nonExistentTransactionId)).thenReturn(Optional.empty());
+
+        // When & Then
+        assertThatThrownBy(() -> transactionService.updateTransaction(nonExistentTransactionId, updateRequest))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessage("Transaction not found with id: " + nonExistentTransactionId);
+    }
+
+    @Test
+    void updateTransaction_whenTransactionBelongsToAnotherUser_shouldThrowUnauthorizedException() {
+        // Given
+        mockCurrentUser();
+        Long transactionId = 1L;
+        Transaction otherUserTransaction = Transaction.builder()
+                .id(transactionId)
+                .amount(new BigDecimal("25.00"))
+                .transactionDate(LocalDate.now())
+                .category(userOwnedCategory)
+                .user(otherUser) // Belongs to other user
+                .merchant("Cinema")
+                .build();
+        TransactionUpdateRequest updateRequest = new TransactionUpdateRequest(); // Request doesn't matter for auth check
+
+        when(transactionRepository.findById(transactionId)).thenReturn(Optional.of(otherUserTransaction));
+
+        // When & Then
+        assertThatThrownBy(() -> transactionService.updateTransaction(transactionId, updateRequest))
+                .isInstanceOf(UnauthorizedException.class)
+                .hasMessage("User not authorized for this transaction");
+    }
+
+    @Test
+    void updateTransaction_whenUpdatingWithUnauthorizedCategory_shouldThrowUnauthorizedException() {
+        // Given
+        mockCurrentUser();
+        Long transactionId = 1L;
+        Transaction existingTransaction = Transaction.builder()
+                .id(transactionId)
+                .amount(new BigDecimal("50.00"))
+                .transactionDate(LocalDate.now())
+                .category(userOwnedCategory)
+                .user(currentUser)
+                .merchant("Cafe")
+                .build();
+
+        Category unauthorizedCategory = new Category();
+        unauthorizedCategory.setId(99L);
+        unauthorizedCategory.setUser(otherUser); // Category belongs to another user
+        unauthorizedCategory.setSystem(false);
+
+        TransactionUpdateRequest updateRequest = TransactionUpdateRequest.builder()
+                .categoryId(unauthorizedCategory.getId())
+                .build();
+
+        when(transactionRepository.findById(transactionId)).thenReturn(Optional.of(existingTransaction));
+        when(categoryRepository.findById(unauthorizedCategory.getId())).thenReturn(Optional.of(unauthorizedCategory));
+
+        // When & Then
+        assertThatThrownBy(() -> transactionService.updateTransaction(transactionId, updateRequest))
+                .isInstanceOf(UnauthorizedException.class)
+                .hasMessage("User not authorized for this category");
+    }
 }
+
