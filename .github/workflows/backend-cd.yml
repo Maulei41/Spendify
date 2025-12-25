@@ -26,6 +26,16 @@ jobs:
           java-version: '17'
           cache: maven
 
+      - name: Debug SSH config
+        run: |
+          echo "SSH_HOST length: ${#SSH_HOST}"
+          echo "SSH_USER: $SSH_USER"
+          echo "SSH_KEY length: ${#SSH_KEY}"
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+
       - name: Grant execute permissions to mvnw
         run: chmod +x mvnw
 
