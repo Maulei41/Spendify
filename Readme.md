@@ -8,6 +8,7 @@ ___
 ___
 
 - [Background](#background)
+- [Features](#features)
 - [Install](#install)
 
 ## Background
@@ -23,7 +24,7 @@ Spendify addresses this gap through:
 
 The application targets Hong Kong's digital-first population with a cross-platform mobile app (iOS/Android) and web interface, enabling instant receipt capture and centralized expense tracking across all transaction platforms.
 
-## Features  
+## Features
 ___
 ### Receipt Scanning & OCR
 - Real-time receipt capture via mobile camera
