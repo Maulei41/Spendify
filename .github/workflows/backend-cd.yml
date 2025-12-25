@@ -32,21 +32,29 @@ jobs:
       - name: Build JAR with Maven
         run: ./mvnw -B clean package -DskipTests
 
-      - name: Copy new JAR to app directory
+      - name: Debug - Show built JAR
         run: |
-          # Adjust path if your spendify folder is elsewhere
-          cp target/backend-*.jar ~/spendify/app.jar
-          echo "JAR copied to ~/spendify/app.jar"
+          echo "Built JAR files:"
+          ls -la target/
+          find target -name "*.jar" -ls
 
-      - name: Restart Spendify service (local)
+      - name: Deploy JAR to local app directory
+        run: |
+          cp target/backend-*.jar ~/spendify/app.jar
+          echo "New JAR deployed to ~/spendify/app.jar"
+
+      - name: Restart Spendify service
         run: |
           sudo systemctl daemon-reload
           sudo systemctl restart spendify
-          sleep 5
+          sleep 8
+
           systemctl status spendify --no-pager
 
           if ! systemctl is-active --quiet spendify; then
-            echo "Service failed. Showing logs:"
-            journalctl -u spendify -n 30
+            echo "Service failed!"
+            journalctl -u spendify -n 50 --no-pager
             exit 1
+          else
+            echo "Service running!"
           fi
