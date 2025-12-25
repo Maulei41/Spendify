@@ -32,12 +32,15 @@ jobs:
       - name: Build JAR with Maven
         run: ./mvnw -B clean package -DskipTests
 
+      - name: Install sshpass
+        run: sudo apt-get update && sudo apt-get install -y sshpass
+
       - name: Deploy JAR via SCP (Password Auth)
         env:
           SSH_PASSWORD: ${{ secrets.SSH_PASSWORD }}
         run: |
           sshpass -p "$SSH_PASSWORD" scp -o StrictHostKeyChecking=no \
-            backend/target/*.jar \
+            backend/target/backend-*.jar \
             ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/home/${{ secrets.SSH_USER }}/spendify/app.jar
 
       - name: Restart app on server (Password Auth)
