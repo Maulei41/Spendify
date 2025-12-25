@@ -32,6 +32,14 @@ jobs:
       - name: Build JAR with Maven
         run: ./mvnw -B clean package -DskipTests
 
+      - name: Debug - List target files
+        run: |
+          echo "Current directory: $(pwd)"
+          echo "Files in backend/target:"
+          ls -la target/ || echo "target/ directory not found"
+          echo "JAR files found:"
+          find . -name "*.jar" -type f
+
       - name: Install sshpass
         run: sudo apt-get update && sudo apt-get install -y sshpass
 
@@ -40,7 +48,7 @@ jobs:
           SSH_PASSWORD: ${{ secrets.SSH_PASSWORD }}
         run: |
           sshpass -p "$SSH_PASSWORD" scp -o StrictHostKeyChecking=no \
-            backend/target/backend-*.jar \
+            target/backend-*.jar \
             ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/home/${{ secrets.SSH_USER }}/spendify/app.jar
 
       - name: Restart app on server (Password Auth)
