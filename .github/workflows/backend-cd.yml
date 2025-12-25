@@ -26,41 +26,24 @@ jobs:
           java-version: '17'
           cache: maven
 
-      - name: Debug SSH config
-        run: |
-          echo "SSH_HOST length: ${#SSH_HOST}"
-          echo "SSH_USER: $SSH_USER"
-          echo "SSH_KEY length: ${#SSH_KEY}"
-        env:
-          SSH_HOST: ${{ secrets.SSH_HOST }}
-          SSH_USER: ${{ secrets.SSH_USER }}
-          SSH_KEY: ${{ secrets.SSH_KEY }}
-
       - name: Grant execute permissions to mvnw
         run: chmod +x mvnw
 
       - name: Build JAR with Maven
         run: ./mvnw -B clean package -DskipTests
 
-      - name: Copy JAR to server via SCP
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_KEY }}
-          source: "backend/target/*.jar"
-          target: "/home/fyp25073/spendify"
-          strip_components: 2
+      - name: Deploy JAR via SCP (Password Auth)
+        env:
+          SSH_PASSWORD: ${{ secrets.SSH_PASSWORD }}
+        run: |
+          sshpass -p "$SSH_PASSWORD" scp -o StrictHostKeyChecking=no \
+            backend/target/*.jar \
+            ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/home/${{ secrets.SSH_USER }}/spendify/app.jar
 
-      - name: Restart app on server
-        uses: appleboy/ssh-action@v0.1.10
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_KEY }}
-          script: |
-            cd /home/fyp25073/spendify
-            mv *.jar app.jar
-            sudo systemctl restart spendify
-            sleep 3
-            systemctl status spendify --no-pager
+      - name: Restart app on server (Password Auth)
+        env:
+          SSH_PASSWORD: ${{ secrets.SSH_PASSWORD }}
+        run: |
+          sshpass -p "$SSH_PASSWORD" ssh -o StrictHostKeyChecking=no \
+            ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
+            "cd /home/${{ secrets.SSH_USER }}/spendify && sudo systemctl restart spendify && sleep 3 && systemctl status spendify --no-pager"
