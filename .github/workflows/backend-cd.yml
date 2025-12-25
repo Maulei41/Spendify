@@ -9,7 +9,7 @@ on:
 
 jobs:
   deploy:
-    runs-on: self-hosted
+    runs-on: self-hosted  # Your HKU runner
 
     defaults:
       run:
@@ -32,57 +32,21 @@ jobs:
       - name: Build JAR with Maven
         run: ./mvnw -B clean package -DskipTests
 
-      - name: Debug - List built JAR
+      - name: Copy new JAR to app directory
         run: |
-          echo "Files in target/:"
-          ls -la target/
-          echo "JAR file:"
-          find target -name "*.jar" -type f
+          # Adjust path if your spendify folder is elsewhere
+          cp target/backend-*.jar ~/spendify/app.jar
+          echo "JAR copied to ~/spendify/app.jar"
 
-      - name: Deploy JAR via SCP (Key-based SSH)
-        env:
-          SSH_PRIVATE_KEY: ${{ secrets.SSH_KEY }}
+      - name: Restart Spendify service (local)
         run: |
-          mkdir -p ~/.ssh
-          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
+          sudo systemctl daemon-reload
+          sudo systemctl restart spendify
+          sleep 5
+          systemctl status spendify --no-pager
 
-          scp target/backend-*.jar ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/home/${{ secrets.SSH_USER }}/spendify/app.jar
-
-      - name: Restart app on server (with sudo password)
-        env:
-          SSH_PRIVATE_KEY: ${{ secrets.SSH_KEY }}
-          SUDO_PASSWORD: ${{ secrets.SUDO_PASSWORD }}  # New secret for sudo
-        run: |
-          mkdir -p ~/.ssh
-          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
-
-          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << EOF
-            # Make sure directory exists
-            mkdir -p /home/${{ secrets.SSH_USER }}/spendify
-
-            # Use sshpass for sudo only (install if missing)
-            if ! command -v sshpass &> /dev/null; then
-              sudo apt-get update && sudo apt-get install -y sshpass
-            fi
-
-            # Restart service using sudo with password via sshpass
-            SSHPASS="\$SUDO_PASSWORD" sshpass -e sudo systemctl restart spendify
-
-            sleep 3
-            systemctl status spendify --no-pager
-
-            # Optional: show logs if failed
-            if ! systemctl is-active --quiet spendify; then
-              echo "Service failed. Recent logs:"
-              journalctl -u spendify -n 20 --no-pager
-              exit 1
-            fi
-          EOF
-
-      - name: Cleanup SSH key
-        if: always()
-        run: rm -f ~/.ssh/id_rsa
+          if ! systemctl is-active --quiet spendify; then
+            echo "Service failed. Showing logs:"
+            journalctl -u spendify -n 30
+            exit 1
+          fi
