@@ -43,7 +43,7 @@ jobs:
 
       - name: Deploy JAR via SCP (Key-based SSH)
         env:
-          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}  # Your private key for the server
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_KEY }}  # Your private key for the server
         run: |
           # Install SSH key temporarily
           mkdir -p ~/.ssh
@@ -58,7 +58,7 @@ jobs:
 
       - name: Restart app on server (Key-based SSH)
         env:
-          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_KEY }}
         run: |
           # Reuse the same SSH key setup (in case previous step didn't persist)
           mkdir -p ~/.ssh
