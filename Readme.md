@@ -7,8 +7,8 @@ ___
 ## Table of Content
 ___
 
-- Background
-- install
+- [Background](#background)
+- [Install](#install)
 
 ## Background
 ___
