@@ -38,9 +38,9 @@ jobs:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
-          source: "target/*.jar"
+          source: "backend/target/*.jar"
           target: "/home/fyp25073/spendify"
-          strip_components: 1
+          strip_components: 2
 
       - name: Restart app on server
         uses: appleboy/ssh-action@v0.1.10
