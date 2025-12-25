@@ -9,7 +9,8 @@ on:
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest
+    # Use your self-hosted runner (adjust label if you added custom ones, e.g. 'hku-runner')
+    runs-on: self-hosted
 
     defaults:
       run:
@@ -32,29 +33,48 @@ jobs:
       - name: Build JAR with Maven
         run: ./mvnw -B clean package -DskipTests
 
-      - name: Debug - List target files
+      - name: Debug - List built JAR
         run: |
           echo "Current directory: $(pwd)"
-          echo "Files in backend/target:"
-          ls -la target/ || echo "target/ directory not found"
-          echo "JAR files found:"
-          find . -name "*.jar" -type f
+          echo "Files in target/:"
+          ls -la target/
+          echo "JAR file:"
+          find target -name "*.jar" -type f
 
-      - name: Install sshpass
-        run: sudo apt-get update && sudo apt-get install -y sshpass
-
-      - name: Deploy JAR via SCP (Password Auth)
+      - name: Deploy JAR via SCP (Key-based SSH)
         env:
-          SSH_PASSWORD: ${{ secrets.SSH_PASSWORD }}
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}  # Your private key for the server
         run: |
-          sshpass -p "$SSH_PASSWORD" scp -o StrictHostKeyChecking=no \
-            target/backend-*.jar \
-            ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/home/${{ secrets.SSH_USER }}/spendify/app.jar
+          # Install SSH key temporarily
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
 
-      - name: Restart app on server (Password Auth)
+          # Add host key to known_hosts to avoid StrictHostKeyChecking prompt
+          ssh-keyscan -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
+
+          # Copy the built JAR (there should be exactly one)
+          scp target/backend-*.jar ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/home/${{ secrets.SSH_USER }}/spendify/app.jar
+
+      - name: Restart app on server (Key-based SSH)
         env:
-          SSH_PASSWORD: ${{ secrets.SSH_PASSWORD }}
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
         run: |
-          sshpass -p "$SSH_PASSWORD" ssh -o StrictHostKeyChecking=no \
-            ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
-            "cd /home/${{ secrets.SSH_USER }}/spendify && sudo systemctl restart spendify && sleep 3 && systemctl status spendify --no-pager"
+          # Reuse the same SSH key setup (in case previous step didn't persist)
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
+
+          # Restart service and check status
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
+            cd /home/${{ secrets.SSH_USER }}/spendify
+            sudo systemctl restart spendify
+            sleep 3
+            systemctl status spendify --no-pager
+          EOF
+
+      - name: Cleanup SSH key (security best practice)
+        if: always()
+        run: |
+          rm -f ~/.ssh/id_rsa
