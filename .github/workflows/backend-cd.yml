@@ -29,6 +29,7 @@ jobs:
       - name: Grant execute permissions to mvnw
         run: chmod +x mvnw
 
+
       - name: Build JAR with Maven
         run: ./mvnw -B clean package -DskipTests
 

@@ -19,8 +19,7 @@ public class ApplicationConfig {
 
     private final CustomUserDetailsService userDetailsService;
 
-    @Value("${tesseract.data-path}")
-    private String tesseractDataPath;
+
 
     @Bean
     public AuthenticationProvider authenticationProvider() {
@@ -40,10 +39,5 @@ public class ApplicationConfig {
         return new BCryptPasswordEncoder(12);
     }
 
-    @Bean
-    public Tesseract tesseract() {
-        Tesseract tesseract = new Tesseract();
-        tesseract.setDatapath(tesseractDataPath);
-        return tesseract;
-    }
+
 }
