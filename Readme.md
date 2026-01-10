@@ -1,7 +1,7 @@
 # Spendify - your finanical tracker
 ___
 [![standard-readme compliant](https://img.shields.io/badge/readme%20style-standard-brightgreen.svg?style=flat-square)](https://github.com/RichardLitt/standard-readme)
-
+ 
 > Automated expense tracking for Hong Kong's digital financial ecosystem. Spendify combines optical character recognition (OCR), machine learning, and budget analytics to help young professionals manage personal finances in a high-cost urban environment.
 
 ## Table of Content
