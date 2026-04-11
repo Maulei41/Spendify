@@ -1,0 +1,12 @@
+fastapi
+uvicorn
+pydantic
+torch
+transformers
+datasets
+scikit-learn
+python-multipart
+xmltodict
+kagglehub
+kaggle
+accelerate
