@@ -2,8 +2,6 @@ package com.spendify.backend.config;
 
 import com.spendify.backend.service.CustomUserDetailsService;
 import lombok.RequiredArgsConstructor;
-import net.sourceforge.tess4j.Tesseract;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -12,14 +10,15 @@ import org.springframework.security.authentication.dao.DaoAuthenticationProvider
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.web.client.RestTemplate;
+import net.sourceforge.tess4j.ITesseract;
+import net.sourceforge.tess4j.Tesseract;
 
 @Configuration
 @RequiredArgsConstructor
 public class ApplicationConfig {
 
     private final CustomUserDetailsService userDetailsService;
-
-
 
     @Bean
     public AuthenticationProvider authenticationProvider() {
@@ -39,5 +38,13 @@ public class ApplicationConfig {
         return new BCryptPasswordEncoder(12);
     }
 
+    @Bean
+    public RestTemplate restTemplate() {
+        return new RestTemplate();
+    }
 
+    @Bean
+    public ITesseract tesseract() {
+        return new Tesseract();
+    }
 }
