@@ -5,6 +5,7 @@ import com.spendify.backend.entity.OcrProcessingLog;
 import com.spendify.backend.repository.OcrProcessingLogRepository;
 import net.sourceforge.tess4j.Tesseract;
 import net.sourceforge.tess4j.TesseractException;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -42,6 +43,11 @@ public class OcrService {
     private static final Pattern UNWANTED_COMPANY_PATTERN = Pattern.compile("^(?!.*(RECEIPT|INVOICE|TAX|SUBTOTAL)).*$");
 
     private final OcrProcessingLogRepository ocrProcessingLogRepository;
+
+    @Autowired
+    public OcrService(OcrProcessingLogRepository ocrProcessingLogRepository) {
+        this.ocrProcessingLogRepository = ocrProcessingLogRepository;
+    }
 
     @Value("${tesseract.data.path:tessdata}")
     private String tesseractDataPath;
