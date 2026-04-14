@@ -67,19 +67,22 @@ public class OcrService {
         try {
             validateImage(file);
 
+            // Read and validate the image
+            BufferedImage image = ImageIO.read(file.getInputStream());
+            if (image == null) {
+                throw new IllegalArgumentException("Failed to read image file: unsupported or corrupted format");
+            }
+            if (image.getWidth() == 0 || image.getHeight() == 0) {
+                throw new IllegalArgumentException("Invalid image dimensions: 0x0");
+            }
+
             // Create a new Tesseract instance per request (native code is not thread-safe)
             Tesseract tesseract = new Tesseract();
 
             // Configure Tesseract
             tesseract.setDatapath(tesseractDataPath);
             tesseract.setLanguage(tesseractLanguage);
-            tesseract.setPageSegMode(1); // Automatic page segmentation with OSD
-
-            // Read the image
-            BufferedImage image = ImageIO.read(file.getInputStream());
-            if (image == null) {
-                throw new IOException("Failed to read image file");
-            }
+            tesseract.setPageSegMode(3); // Fully automatic page segmentation with OSD (more robust)
 
             // Perform OCR
             String extractedText = tesseract.doOCR(image);
@@ -138,6 +141,22 @@ public class OcrService {
             orclog.setErrorMessage("Tesseract OCR processing failed: " + e.getMessage());
             ocrProcessingLogRepository.save(orclog);
             throw new RuntimeException("OCR processing failed: " + e.getMessage(), e);
+        } catch (UnsatisfiedLinkError | ExceptionInInitializerError e) {
+            long endTime = System.currentTimeMillis();
+            orclog.setProcessingTimeMs(endTime - startTime);
+            orclog.setSuccessful(false);
+            orclog.setErrorMessage("Tesseract native library error: " + e.getMessage());
+            ocrProcessingLogRepository.save(orclog);
+            log.error("Tesseract native crash detected", e);
+            throw new RuntimeException("OCR service unavailable: native library error", e);
+        } catch (Error e) {
+            long endTime = System.currentTimeMillis();
+            orclog.setProcessingTimeMs(endTime - startTime);
+            orclog.setSuccessful(false);
+            orclog.setErrorMessage("Fatal error during OCR: " + e.getMessage());
+            ocrProcessingLogRepository.save(orclog);
+            log.error("Fatal error in OCR processing", e);
+            throw new RuntimeException("OCR service error: " + e.getMessage(), e);
         } catch (IOException e) {
             long endTime = System.currentTimeMillis();
             orclog.setProcessingTimeMs(endTime - startTime);
