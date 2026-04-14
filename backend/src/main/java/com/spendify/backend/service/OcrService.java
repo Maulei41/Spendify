@@ -3,8 +3,6 @@ package com.spendify.backend.service;
 import com.spendify.backend.dto.OcrResponse;
 import com.spendify.backend.entity.OcrProcessingLog;
 import com.spendify.backend.repository.OcrProcessingLogRepository;
-import lombok.RequiredArgsConstructor;
-import net.sourceforge.tess4j.ITesseract;
 import net.sourceforge.tess4j.Tesseract;
 import net.sourceforge.tess4j.TesseractException;
 import org.springframework.beans.factory.annotation.Value;
@@ -28,9 +26,11 @@ import org.slf4j.LoggerFactory;
 /**
  * OCR service that uses Tesseract for receipt text extraction
  * and applies rule-based post-processing to extract entities.
+ * 
+ * Note: A new Tesseract instance is created per request because
+ * Tesseract's native code is not thread-safe.
  */
 @Service
-@RequiredArgsConstructor
 public class OcrService {
 
     private static final Logger log = LoggerFactory.getLogger(OcrService.class);
@@ -42,7 +42,6 @@ public class OcrService {
     private static final Pattern UNWANTED_COMPANY_PATTERN = Pattern.compile("^(?!.*(RECEIPT|INVOICE|TAX|SUBTOTAL)).*$");
 
     private final OcrProcessingLogRepository ocrProcessingLogRepository;
-    private final ITesseract tesseract;
 
     @Value("${tesseract.data.path:tessdata}")
     private String tesseractDataPath;
@@ -61,6 +60,9 @@ public class OcrService {
 
         try {
             validateImage(file);
+
+            // Create a new Tesseract instance per request (native code is not thread-safe)
+            Tesseract tesseract = new Tesseract();
 
             // Configure Tesseract
             tesseract.setDatapath(tesseractDataPath);
