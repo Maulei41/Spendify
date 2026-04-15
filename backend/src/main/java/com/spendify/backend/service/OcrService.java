@@ -35,6 +35,7 @@ import org.slf4j.LoggerFactory;
 public class OcrService {
 
     private static final Logger log = LoggerFactory.getLogger(OcrService.class);
+    private static final int MAX_IMAGE_DIMENSION = 8000;
 
     // Regex patterns from Python code
     private static final Pattern DATE_PATTERN_1 = Pattern.compile("\\d{4}[-/]\\d{2}[-/]\\d{2}");
@@ -76,9 +77,22 @@ public class OcrService {
                 throw new IllegalArgumentException("Invalid image dimensions: 0x0");
             }
 
+            // Reject excessively large images to prevent native memory issues
+            if (image.getWidth() > MAX_IMAGE_DIMENSION || image.getHeight() > MAX_IMAGE_DIMENSION) {
+                throw new IllegalArgumentException(
+                        String.format("Image dimensions (%dx%d) exceed the maximum allowed limit of %dx%d.",
+                                image.getWidth(), image.getHeight(), MAX_IMAGE_DIMENSION, MAX_IMAGE_DIMENSION)
+                );
+            }
+
+            log.info("Processing image: {}x{} pixels, type: {}", image.getWidth(), image.getHeight(), image.getType());
+
+
             // Convert to TYPE_BYTE_GRAY to avoid native Tesseract crashes
             // Tesseract is known to crash with RGBA, custom color models, etc.
             BufferedImage grayImage = convertToGrayscale(image);
+            log.info("Converted image to grayscale: {}x{} pixels, type: {}", grayImage.getWidth(), grayImage.getHeight(), grayImage.getType());
+
 
             // Create a new Tesseract instance per request (native code is not thread-safe)
             Tesseract tesseract = new Tesseract();
