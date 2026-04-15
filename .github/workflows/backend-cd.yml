@@ -32,9 +32,25 @@ jobs:
       - name: Setup tessdata directory for application
         run: |
           mkdir -p ~/spendify/tessdata
-          # Copy existing Tesseract language data from system to app directory
-          cp $(find /usr/share/tesseract-ocr -name "eng.traineddata" 2>/dev/null | head -1) ~/spendify/tessdata/ 2>/dev/null || echo "eng.traineddata not found on server"
-          cp $(find /usr/share/tesseract-ocr -name "chi_sim.traineddata" 2>/dev/null | head -1) ~/spendify/tessdata/ 2>/dev/null || echo "chi_sim.traineddata not found on server"
+          # Copy eng.traineddata from system
+          ENG_PATH=$(find /usr/share/tesseract-ocr -name "eng.traineddata" 2>/dev/null | head -1)
+          if [ -n "$ENG_PATH" ]; then
+            cp "$ENG_PATH" ~/spendify/tessdata/eng.traineddata
+            echo "Copied eng.traineddata from system"
+          else
+            echo "WARNING: eng.traineddata not found on system"
+          fi
+          # Download chi_sim.traineddata from official Tesseract repo
+          CHI_SIM_PATH=$(find /usr/share/tesseract-ocr -name "chi_sim.traineddata" 2>/dev/null | head -1)
+          if [ -n "$CHI_SIM_PATH" ]; then
+            cp "$CHI_SIM_PATH" ~/spendify/tessdata/chi_sim.traineddata
+            echo "Copied chi_sim.traineddata from system"
+          else
+            echo "Downloading chi_sim.traineddata..."
+            curl -L -o ~/spendify/tessdata/chi_sim.traineddata \
+              "https://github.com/tesseract-ocr/tessdata/raw/main/chi_sim.traineddata"
+            echo "Downloaded chi_sim.traineddata"
+          fi
           echo "Contents of ~/spendify/tessdata:"
           ls -la ~/spendify/tessdata/
 
