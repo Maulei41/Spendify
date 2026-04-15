@@ -102,15 +102,9 @@ public class OcrService {
             tesseract.setLanguage(tesseractLanguage);
             tesseract.setPageSegMode(3); // Fully automatic page segmentation with OSD (more robust)
 
-            // Verify Tesseract initialized correctly BEFORE calling doOCR()
-            // If language data files are missing, doOCR() will crash with SIGSEGV
-            int initResult = tesseract.init(tesseractDataPath, tesseractLanguage);
-            if (initResult != 0) {
-                throw new IllegalStateException(
-                    "Tesseract failed to initialize. Required traineddata files not found for language(s): '"
-                    + tesseractLanguage + "' at datapath: '" + tesseractDataPath + "'. "
-                    + "Ensure files like eng.traineddata exist at <datapath>/<lang>.traineddata");
-            }
+            // Validate that required traineddata files exist before calling doOCR()
+            // Missing traineddata causes SIGSEGV in native Tesseract code
+            validateTrainedDataFiles(tesseractDataPath, tesseractLanguage);
 
             // Perform OCR on the normalized grayscale image
             String extractedText = tesseract.doOCR(grayImage);
@@ -441,6 +435,25 @@ public class OcrService {
         if (file.getSize() > 10 * 1024 * 1024) { // 10MB
             throw new IllegalArgumentException("File too large (max 10MB)");
         }
+    }
+
+    /**
+     * Validate that required Tesseract trained data files exist.
+     * Missing traineddata causes SIGSEGV in native Tesseract code.
+     */
+    private void validateTrainedDataFiles(String datapath, String languages) {
+        String[] langs = languages.split("\\+");
+        for (String lang : langs) {
+            String langTrimmed = lang.trim();
+            java.io.File trainedDataFile = new java.io.File(datapath, langTrimmed + ".traineddata");
+            if (!trainedDataFile.exists()) {
+                throw new IllegalStateException(
+                    "Missing Tesseract traineddata file: " + trainedDataFile.getAbsolutePath() +
+                    ". OCR requires language training data files. Ensure '" + langTrimmed + ".traineddata' " +
+                    "exists in the configured datapath: '" + datapath + "'.");
+            }
+        }
+        log.info("Validated trained data files exist for languages: {}", languages);
     }
 
     private BufferedImage convertToGrayscale(BufferedImage originalImage) {
