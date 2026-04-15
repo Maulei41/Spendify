@@ -32,29 +32,12 @@ jobs:
       - name: Setup tessdata directory for application
         run: |
           mkdir -p ~/spendify/tessdata
-          # Copy eng.traineddata from system
           ENG_PATH=$(find /usr/share/tesseract-ocr -name "eng.traineddata" 2>/dev/null | head -1)
           if [ -n "$ENG_PATH" ]; then
             cp "$ENG_PATH" ~/spendify/tessdata/eng.traineddata
             echo "Copied eng.traineddata from system"
           else
             echo "WARNING: eng.traineddata not found on system"
-          fi
-          # Download chi_sim.traineddata from official Tesseract repo
-          CHI_SIM_PATH=$(find /usr/share/tesseract-ocr -name "chi_sim.traineddata" 2>/dev/null | head -1)
-          if [ -n "$CHI_SIM_PATH" ]; then
-            cp "$CHI_SIM_PATH" ~/spendify/tessdata/chi_sim.traineddata
-            echo "Copied chi_sim.traineddata from system"
-          else
-            echo "Downloading chi_sim.traineddata..."
-            # chi_sim.traineddata is a large LFS file, use wget with raw.githubusercontent.com
-            wget -q -O ~/spendify/tessdata/chi_sim.traineddata \
-              "https://raw.githubusercontent.com/tesseract-ocr/tessdata/main/chi_sim.traineddata" \
-              2>/dev/null || \
-            curl -fSL -o ~/spendify/tessdata/chi_sim.traineddata \
-              "https://github.com/tesseract-ocr/tessdata/releases/download/4.1.0/chi_sim.traineddata" \
-              2>/dev/null || \
-            echo "ERROR: Failed to download chi_sim.traineddata"
           fi
           echo "Contents of ~/spendify/tessdata:"
           ls -la ~/spendify/tessdata/
