@@ -47,9 +47,14 @@ jobs:
             echo "Copied chi_sim.traineddata from system"
           else
             echo "Downloading chi_sim.traineddata..."
-            curl -L -o ~/spendify/tessdata/chi_sim.traineddata \
-              "https://github.com/tesseract-ocr/tessdata/raw/main/chi_sim.traineddata"
-            echo "Downloaded chi_sim.traineddata"
+            # chi_sim.traineddata is a large LFS file, use wget with raw.githubusercontent.com
+            wget -q -O ~/spendify/tessdata/chi_sim.traineddata \
+              "https://raw.githubusercontent.com/tesseract-ocr/tessdata/main/chi_sim.traineddata" \
+              2>/dev/null || \
+            curl -fSL -o ~/spendify/tessdata/chi_sim.traineddata \
+              "https://github.com/tesseract-ocr/tessdata/releases/download/4.1.0/chi_sim.traineddata" \
+              2>/dev/null || \
+            echo "ERROR: Failed to download chi_sim.traineddata"
           fi
           echo "Contents of ~/spendify/tessdata:"
           ls -la ~/spendify/tessdata/
