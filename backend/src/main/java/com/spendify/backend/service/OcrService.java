@@ -76,6 +76,10 @@ public class OcrService {
                 throw new IllegalArgumentException("Invalid image dimensions: 0x0");
             }
 
+            // Convert to TYPE_BYTE_GRAY to avoid native Tesseract crashes
+            // Tesseract is known to crash with RGBA, custom color models, etc.
+            BufferedImage grayImage = convertToGrayscale(image);
+
             // Create a new Tesseract instance per request (native code is not thread-safe)
             Tesseract tesseract = new Tesseract();
 
@@ -84,8 +88,8 @@ public class OcrService {
             tesseract.setLanguage(tesseractLanguage);
             tesseract.setPageSegMode(3); // Fully automatic page segmentation with OSD (more robust)
 
-            // Perform OCR
-            String extractedText = tesseract.doOCR(image);
+            // Perform OCR on the normalized grayscale image
+            String extractedText = tesseract.doOCR(grayImage);
             
             log.info("Text extracted by Tesseract:\n{}", extractedText);
             orclog.setDetectedText(extractedText);
@@ -402,16 +406,34 @@ public class OcrService {
         }
 
         String contentType = file.getContentType();
-        if (!"image/jpeg".equals(contentType) && 
-            !"image/png".equals(contentType) && 
-            !"image/webp".equals(contentType) &&
-            !"image/bmp".equals(contentType) &&
-            !"image/gif".equals(contentType)) {
+        if (!"image/jpeg".equals(contentType) &&
+                !"image/png".equals(contentType) &&
+                !"image/webp".equals(contentType) &&
+                !"image/bmp".equals(contentType) &&
+                !"image/gif".equals(contentType)) {
             throw new IllegalArgumentException("Unsupported image format: " + contentType);
         }
 
         if (file.getSize() > 10 * 1024 * 1024) { // 10MB
             throw new IllegalArgumentException("File too large (max 10MB)");
         }
+    }
+
+    private BufferedImage convertToGrayscale(BufferedImage originalImage) {
+        if (originalImage.getType() == BufferedImage.TYPE_BYTE_GRAY) {
+            return originalImage; // Already grayscale
+        }
+
+        // Create a new grayscale image
+        BufferedImage grayImage = new BufferedImage(
+                originalImage.getWidth(),
+                originalImage.getHeight(),
+                BufferedImage.TYPE_BYTE_GRAY);
+
+        // Draw the original image onto the grayscale image, which performs the conversion
+        grayImage.getGraphics().drawImage(originalImage, 0, 0, null);
+        grayImage.getGraphics().dispose();
+
+        return grayImage;
     }
 }
