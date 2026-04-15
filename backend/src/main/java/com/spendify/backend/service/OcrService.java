@@ -102,6 +102,16 @@ public class OcrService {
             tesseract.setLanguage(tesseractLanguage);
             tesseract.setPageSegMode(3); // Fully automatic page segmentation with OSD (more robust)
 
+            // Verify Tesseract initialized correctly BEFORE calling doOCR()
+            // If language data files are missing, doOCR() will crash with SIGSEGV
+            int initResult = tesseract.init(tesseractDataPath, tesseractLanguage);
+            if (initResult != 0) {
+                throw new IllegalStateException(
+                    "Tesseract failed to initialize. Required traineddata files not found for language(s): '"
+                    + tesseractLanguage + "' at datapath: '" + tesseractDataPath + "'. "
+                    + "Ensure files like eng.traineddata exist at <datapath>/<lang>.traineddata");
+            }
+
             // Perform OCR on the normalized grayscale image
             String extractedText = tesseract.doOCR(grayImage);
             
