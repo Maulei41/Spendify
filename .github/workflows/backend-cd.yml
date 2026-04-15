@@ -29,6 +29,23 @@ jobs:
       - name: Grant execute permissions to mvnw
         run: chmod +x mvnw
 
+      - name: Install Tesseract OCR and language data
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq tesseract-ocr tesseract-ocr-eng tesseract-ocr-chi-sim
+          echo "Tesseract version:"
+          tesseract --version
+          echo "Installed languages:"
+          tesseract --list-langs
+
+      - name: Setup tessdata directory for application
+        run: |
+          mkdir -p ~/spendify/tessdata
+          # Copy system Tesseract language data to app tessdata directory
+          cp /usr/share/tesseract-ocr/*/tessdata/eng.traineddata ~/spendify/tessdata/
+          cp /usr/share/tesseract-ocr/*/tessdata/chi_sim.traineddata ~/spendify/tessdata/
+          echo "Copied traineddata files to ~/spendify/tessdata/"
+          ls -la ~/spendify/tessdata/
 
       - name: Build JAR with Maven
         run: ./mvnw -B clean package -DskipTests
