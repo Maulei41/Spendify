@@ -35,6 +35,11 @@ import org.opencv.core.*;
 import org.opencv.imgcodecs.Imgcodecs;
 import org.opencv.imgproc.Imgproc;
 
+// 文件操作
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+
 /**
  * OCR service that uses Tesseract for receipt text extraction
  * and applies rule-based post-processing to extract entities.
@@ -415,7 +420,7 @@ public class OcrService {
             double maxArea = 0;
             for (MatOfPoint contour : contours) {
                 Rect rect = Imgproc.boundingRect(contour);
-                double area = rect.area();
+                double area = rect.width * rect.height;
                 if (area > maxArea) {
                     maxArea = area;
                     boundingRect = rect;
@@ -424,7 +429,7 @@ public class OcrService {
 
             // 裁剪图像
             Mat cropped;
-            if (boundingRect != null && boundingRect.area() > image.area() * 0.1) {
+            if (boundingRect != null && maxArea > image.cols() * image.rows() * 0.1) {
                 int x = Math.max(0, boundingRect.x);
                 int y = Math.max(0, boundingRect.y);
                 int w = Math.min(image.cols() - x, boundingRect.width);
@@ -478,8 +483,8 @@ public class OcrService {
                 try (OrtSession.Result results = ctpnSession.run(inputs)) {
                     log.info("CTPN 推理耗时：{} ms", System.currentTimeMillis() - startTime);
 
-                    float[][] bboxPred = results.get(0).getFloatBuffer().array();
-                    float[][] scoreProb = results.get(1).getFloatBuffer().array();
+                    float[][] bboxPred = (float[][]) results.get(0).getValue();
+                    float[][] scoreProb = (float[][]) results.get(1).getValue();
 
                     int imgH = preprocessedMat.rows(), imgW = preprocessedMat.cols();
                     int featH = (int) Math.ceil((double) imgH / FEAT_STRIDE);
@@ -695,7 +700,7 @@ public class OcrService {
                 long start = System.currentTimeMillis();
                 try (OrtSession.Result result = charlmSession.run(Collections.singletonMap("input_text", input))) {
                     log.info("CharLM 推理耗时：{} ms", System.currentTimeMillis() - start);
-                    float[][][] pred = result.get(0).getFloatBuffer().array();
+                    float[][][] pred = (float[][][]) result.get(0).getValue();
                     return decodeCharLMPredictions(fullText, pred, textLines);
                 }
             }
