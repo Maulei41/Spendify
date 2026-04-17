@@ -124,6 +124,18 @@
             <artifactId>ij</artifactId>
             <version>1.53j</version>
         </dependency>
+        <!-- ONNX Runtime -->
+        <dependency>
+            <groupId>com.microsoft.onnxruntime</groupId>
+            <artifactId>onnxruntime</artifactId>
+            <version>1.17.0</version>
+        </dependency>
+        <!-- OpenCV for image processing -->
+        <dependency>
+            <groupId>org.openpnp</groupId>
+            <artifactId>opencv</artifactId>
+            <version>4.9.0-0</version>
+        </dependency>
     </dependencies>
 
     <build>
