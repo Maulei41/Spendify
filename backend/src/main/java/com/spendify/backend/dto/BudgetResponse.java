@@ -14,8 +14,6 @@ public class BudgetResponse {
     private Long id;
     private BigDecimal limit;
     private String yearMonth;
-    private Long categoryId;
-    private String categoryName;
     private BigDecimal totalSpent;
     private double percentageSpent;
     private BigDecimal projectedTotal;

@@ -22,7 +22,4 @@ public class CreateBudgetRequest {
     @NotNull(message = "YearMonth is required")
     @Pattern(regexp = "^\\d{4}-\\d{2}$", message = "YearMonth must be in YYYY-MM format")
     private String yearMonth;
-
-    @NotNull(message = "Category ID is required")
-    private Long categoryId;
 }

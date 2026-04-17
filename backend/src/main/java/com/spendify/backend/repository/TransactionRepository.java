@@ -42,6 +42,13 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
             @Param("endDate") LocalDate endDate
     );
 
+    @Query("SELECT SUM(t.amount) FROM Transaction t WHERE t.user.id = :userId AND t.transactionDate BETWEEN :startDate AND :endDate")
+    BigDecimal sumAmountByUserIdAndTransactionDateBetween(
+            @Param("userId") Long userId,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate
+    );
+
     @Modifying
     @Query("UPDATE Transaction t SET t.category.id = :newCategoryId WHERE t.user.id = :userId AND t.category.id = :oldCategoryId")
     void reassignCategory(

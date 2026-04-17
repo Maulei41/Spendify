@@ -4,11 +4,9 @@ import com.spendify.backend.dto.BudgetResponse;
 import com.spendify.backend.dto.CreateBudgetRequest;
 import com.spendify.backend.dto.UpdateBudgetRequest;
 import com.spendify.backend.entity.Budget;
-import com.spendify.backend.entity.Category;
 import com.spendify.backend.entity.User;
 import com.spendify.backend.exception.ResourceNotFoundException;
 import com.spendify.backend.repository.BudgetRepository;
-import com.spendify.backend.repository.CategoryRepository;
 import com.spendify.backend.repository.TransactionRepository;
 import com.spendify.backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -30,24 +28,20 @@ import java.time.temporal.ChronoUnit;
 public class BudgetService {
 
     private final BudgetRepository budgetRepository;
-    private final CategoryRepository categoryRepository;
     private final UserRepository userRepository;
     private final TransactionRepository transactionRepository;
 
     @Transactional
     public BudgetResponse createBudget(CreateBudgetRequest request) {
         User user = getCurrentUser();
-        Category category = categoryRepository.findById(request.getCategoryId())
-                .orElseThrow(() -> new ResourceNotFoundException("Category not found"));
         
-        budgetRepository.findByUserIdAndYearMonthAndCategoryId(user.getId(), request.getYearMonth(), request.getCategoryId())
+        budgetRepository.findByUserIdAndYearMonth(user.getId(), request.getYearMonth())
             .ifPresent(b -> {
-                throw new IllegalStateException("Budget for this category and month already exists.");
+                throw new IllegalStateException("Budget for this month already exists.");
             });
 
         Budget budget = Budget.builder()
                 .user(user)
-                .category(category)
                 .yearMonth(request.getYearMonth())
                 .limit(request.getLimit())
                 .build();
@@ -60,8 +54,6 @@ public class BudgetService {
         User user = getCurrentUser();
         String currentYearMonth = YearMonth.now().format(DateTimeFormatter.ofPattern("yyyy-MM"));
         
-        // This is a simplified logic. In a real scenario, you'd likely want to return
-        // a list of budgets if there can be multiple per month (e.g., per category).
         Budget budget = budgetRepository.findByUserIdAndYearMonth(user.getId(), currentYearMonth)
                 .orElseThrow(() -> new ResourceNotFoundException("Budget for current month not found."));
 
@@ -94,9 +86,8 @@ public class BudgetService {
         LocalDate startDate = yearMonth.atDay(1);
         LocalDate endDate = yearMonth.atEndOfMonth();
 
-        BigDecimal totalSpent = transactionRepository.sumAmountByUserIdAndCategoryIdAndTransactionDateBetween(
+        BigDecimal totalSpent = transactionRepository.sumAmountByUserIdAndTransactionDateBetween(
                 budget.getUser().getId(),
-                budget.getCategory().getId(),
                 startDate,
                 endDate
         );
@@ -121,13 +112,10 @@ public class BudgetService {
             overspendAmount = projectedTotal.subtract(budget.getLimit());
         }
 
-
         return BudgetResponse.builder()
                 .id(budget.getId())
                 .limit(budget.getLimit())
                 .yearMonth(budget.getYearMonth())
-                .categoryId(budget.getCategory().getId())
-                .categoryName(budget.getCategory().getName())
                 .totalSpent(totalSpent)
                 .percentageSpent(percentageSpent)
                 .projectedTotal(projectedTotal)

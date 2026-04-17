@@ -10,7 +10,7 @@ import java.math.BigDecimal;
 
 @Entity
 @Table(name = "budgets", uniqueConstraints = {
-    @UniqueConstraint(columnNames = {"userId", "yearMonth", "categoryId"})
+    @UniqueConstraint(columnNames = {"userId", "yearMonth"})
 })
 @Data
 @Builder
@@ -25,10 +25,6 @@ public class Budget {
     @ManyToOne
     @JoinColumn(name = "userId", nullable = false)
     private User user;
-
-    @ManyToOne
-    @JoinColumn(name = "categoryId", nullable = false)
-    private Category category;
 
     @Column(nullable = false, length = 7) // YYYY-MM
     private String yearMonth;
