@@ -78,6 +78,7 @@ public class OcrService {
     private OrtEnvironment ortEnv;
     private OrtSession ctpnSession;
     private OrtSession charlmSession;
+    private boolean ctpnAvailable = false;
 
     @Autowired
     public OcrService(OcrProcessingLogRepository ocrProcessingLogRepository) {
@@ -110,25 +111,51 @@ public class OcrService {
         }
 
         try {
-            // 加载 OpenCV
-            OpenCV.loadLocally();
-            log.info("OpenCV 已初始化");
+            // 尝试加载 OpenCV native library
+            boolean opencvLoaded = false;
+            try {
+                nu.pattern.OpenCV.loadLocally();
+                log.info("OpenCV 已初始化");
+                opencvLoaded = true;
+            } catch (UnsatisfiedLinkError | Exception e) {
+                log.warn("OpenCV native library 加载失败: {}", e.getMessage());
+                // 继续尝试其他方法
+            }
+
+            // 如果 OpenCV 加载失败，但 ONNX 仍可工作（对于 CharLM）
+            // 我们可以只禁用 CTPN 部分，保留 CharLM
+            if (!opencvLoaded) {
+                log.warn("OpenCV 不可用，CTPN 文本检测将被禁用，但 CharLM 仍可使用");
+                // 设置标志表示 CTPN 不可用
+                ctpnAvailable = false;
+            } else {
+                ctpnAvailable = true;
+            }
 
             // 初始化 ONNX Runtime
             ortEnv = OrtEnvironment.getEnvironment();
 
-            // 加载 CTPN 模型
-            ctpnSession = loadModel(ctpnModelPath, "CTPN");
+            // 只有在 OpenCV 可用时才加载 CTPN 模型
+            if (ctpnAvailable) {
+                ctpnSession = loadModel(ctpnModelPath, "CTPN");
+                log.info("CTPN 模型已加载");
+            } else {
+                ctpnSession = null;
+                log.info("CTPN 模型跳过加载（OpenCV 不可用）");
+            }
 
-            // 加载 CharLM 模型
+            // CharLM 不依赖 OpenCV，总是可以加载
             charlmSession = loadModel(charlmModelPath, "CharLM");
+            log.info("CharLM 模型已加载");
 
-            log.info("✅ ONNX pipeline 初始化完成");
+            log.info("✅ ONNX pipeline 初始化完成 (CTPN: {}, CharLM: {})", 
+                    ctpnAvailable ? "可用" : "不可用", "可用");
 
         } catch (Exception e) {
             log.error("❌ ONNX pipeline 初始化失败：{}", e.getMessage(), e);
             log.warn("将回退到传统 Tesseract 方法");
             onnxEnabled = false;
+            ctpnAvailable = false;
         }
     }
 
@@ -233,32 +260,65 @@ public class OcrService {
     private OcrResponse processWithOnnxPipeline(MultipartFile file, BufferedImage originalImage, 
                                                   OcrProcessingLog ocrLog, long startTime) throws Exception {
         
-        // Step 1: Crop Preprocessing（裁剪预处理）
-        BufferedImage croppedImage = cropPreprocessing(originalImage);
-        log.info("裁剪预处理完成：{}x{} pixels", croppedImage.getWidth(), croppedImage.getHeight());
+        BufferedImage processedImage = originalImage;
+        
+        // Step 1: Crop Preprocessing（裁剪预处理）- 仅在 CTPN 可用时执行
+        if (ctpnAvailable) {
+            try {
+                processedImage = cropPreprocessing(originalImage);
+                log.info("裁剪预处理完成：{}x{} pixels", processedImage.getWidth(), processedImage.getHeight());
+            } catch (Exception e) {
+                log.warn("裁剪预处理失败，使用原始图像: {}", e.getMessage());
+                processedImage = originalImage;
+            }
+        }
 
-        // Step 2: CTPN 文本检测
-        List<TextBox> textProposals = detectTextWithCTPN(croppedImage);
-        log.info("CTPN 检测到 {} 个文本框", textProposals.size());
+        List<String> textLines;
+        
+        // Step 2: CTPN 文本检测 或 全图 OCR
+        if (ctpnAvailable) {
+            try {
+                List<TextBox> textProposals = detectTextWithCTPN(processedImage);
+                log.info("CTPN 检测到 {} 个文本框", textProposals.size());
 
-        // Step 3: 将文本框转换为图像区域用于 Tesseract
-        List<java.awt.Rectangle> textRegions = convertTextBoxesToRegions(textProposals);
+                // Step 3: 将文本框转换为图像区域用于 Tesseract
+                List<java.awt.Rectangle> textRegions = convertTextBoxesToRegions(textProposals);
 
-        // Step 4: Tesseract OCR 引擎
-        String extractedText = runTesseractOnRegions(croppedImage, textRegions);
-        log.info("Tesseract 提取了 {} 个字符", extractedText.length());
-        ocrLog.setDetectedText(extractedText);
+                // Step 4: Tesseract OCR 引擎
+                String extractedText = runTesseractOnRegions(processedImage, textRegions);
+                log.info("Tesseract 提取了 {} 个字符", extractedText.length());
+                ocrLog.setDetectedText(extractedText);
 
-        // Step 5: 文本后处理
-        // 5.1 按 Y 坐标排序
-        // 5.2 合并同一行的文本框
-        // 5.3 移除空白和特殊字符
-        List<String> processedTextLines = postprocessText(extractedText);
-        log.info("文本后处理完成，共 {} 行", processedTextLines.size());
+                // Step 5: 文本后处理
+                textLines = postprocessText(extractedText);
+            } catch (Exception e) {
+                log.warn("CTPN 处理失败，回退到全图 OCR: {}", e.getMessage());
+                String extractedText = runFullImageOCR(processedImage);
+                ocrLog.setDetectedText(extractedText);
+                textLines = Arrays.asList(extractedText.split("\n"));
+            }
+        } else {
+            // CTPN 不可用，直接使用全图 OCR
+            log.info("CTPN 不可用，使用全图 OCR");
+            String extractedText = runFullImageOCR(processedImage);
+            ocrLog.setDetectedText(extractedText);
+            textLines = Arrays.asList(extractedText.split("\n"));
+        }
 
-        // Step 6: CharLM 信息提取
-        Map<String, String> entities = extractEntitiesWithCharLM(processedTextLines);
-        log.info("CharLM 提取实体：{}", entities);
+        log.info("文本后处理完成，共 {} 行", textLines.size());
+
+        // Step 6: CharLM 信息提取（CharLM 不依赖 OpenCV，通常可用）
+        Map<String, String> entities = new HashMap<>();
+        if (charlmSession != null) {
+            try {
+                entities = extractEntitiesWithCharLM(textLines);
+                log.info("CharLM 提取实体：{}", entities);
+            } catch (Exception e) {
+                log.warn("CharLM 提取失败，使用基于规则的方法: {}", e.getMessage());
+            }
+        } else {
+            log.info("CharLM 不可用，使用基于规则的方法");
+        }
 
         // Step 7: 后处理和实体匹配
         String company = entities.getOrDefault("company", "");
@@ -272,13 +332,13 @@ public class OcrService {
         if (company.isEmpty() || date == null || amount == null) {
             log.info("CharLM 未能完整提取实体，使用基于规则的方法进行补充...");
             if (company.isEmpty()) {
-                company = extractCompanyFromText(processedTextLines);
+                company = extractCompanyFromText(textLines);
             }
             if (date == null) {
-                date = extractDateFromText(processedTextLines);
+                date = extractDateFromText(textLines);
             }
             if (amount == null) {
-                amount = extractAmountFromText(processedTextLines);
+                amount = extractAmountFromText(textLines);
             }
         }
 
@@ -301,7 +361,7 @@ public class OcrService {
             warnings.add("Total amount not detected");
         }
 
-        double confidence = calculateConfidence(extractedText);
+        double confidence = calculateConfidence(String.join("\n", textLines));
 
         return OcrResponse.builder()
                 .merchant(company.isEmpty() ? "Unknown Merchant" : company)
