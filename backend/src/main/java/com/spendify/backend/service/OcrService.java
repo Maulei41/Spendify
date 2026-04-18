@@ -786,24 +786,56 @@ public class OcrService {
     }
 
     private String runTesseractOnRegions(BufferedImage image, List<java.awt.Rectangle> regions) throws Exception {
-        if (regions.isEmpty()) return runFullImageOCR(image);
+        if (regions.isEmpty()) {
+            log.info("区域列表为空，回退到全图 OCR");
+            return runFullImageOCR(image);
+        }
+        
         StringBuilder sb = new StringBuilder();
         Tesseract tesseract = new Tesseract();
         tesseract.setDatapath(tesseractDataPath);
         tesseract.setLanguage(tesseractLanguage);
         int ok = 0;
-        for (java.awt.Rectangle r : regions) {
+        
+        log.info("开始在 {} 个区域上运行 Tesseract", regions.size());
+        
+        for (int i = 0; i < regions.size(); i++) {
+            java.awt.Rectangle r = regions.get(i);
             try {
-                BufferedImage crop = image.getSubimage(
-                    Math.max(0, r.x), Math.max(0, r.y),
-                    Math.min(r.width, image.getWidth() - r.x),
-                    Math.min(r.height, image.getHeight() - r.y));
+                int x = Math.max(0, r.x);
+                int y = Math.max(0, r.y);
+                int w = Math.min(r.width, image.getWidth() - x);
+                int h = Math.min(r.height, image.getHeight() - y);
+                
+                // 跳过太小的区域
+                if (w < 10 || h < 10) {
+                    log.debug("跳过区域 {}: {}x{} (太小)", i, w, h);
+                    continue;
+                }
+                
+                BufferedImage crop = image.getSubimage(x, y, w, h);
                 String text = tesseract.doOCR(crop);
-                if (!text.trim().isEmpty()) { sb.append(text.trim()).append("\n"); ok++; }
-            } catch (Exception e) { log.warn("Tesseract 处理区域失败", e); }
+                log.debug("区域 {} ({}x{}): 提取 {} 个字符", i, w, h, text.length());
+                
+                if (!text.trim().isEmpty()) { 
+                    sb.append(text.trim()).append("\n"); 
+                    ok++; 
+                }
+            } catch (Exception e) { 
+                log.warn("Tesseract 处理区域 {} 失败：{}", i, e.getMessage()); 
+            }
         }
-        log.info("Tesseract 成功处理 {}/{} 个区域", ok, regions.size());
-        return sb.toString().trim();
+        
+        String result = sb.toString().trim();
+        log.info("Tesseract 成功处理 {}/{} 个区域，共提取 {} 个字符", ok, regions.size(), result.length());
+        
+        // 如果提取的字符太少，回退到全图 OCR
+        if (result.length() < 20) {
+            log.warn("提取的字符过少 ({}), 回退到全图 OCR", result.length());
+            return runFullImageOCR(image);
+        }
+        
+        return result;
     }
 
     private String runFullImageOCR(BufferedImage image) throws Exception {
