@@ -57,6 +57,8 @@ public class OcrService {
     // Regex patterns from Python code
     private static final Pattern DATE_PATTERN_1 = Pattern.compile("\\d{4}[-/]\\d{2}[-/]\\d{2}");
     private static final Pattern DATE_PATTERN_2 = Pattern.compile("\\d{2}[-/]\\d{2}[-/]\\d{2,4}");
+    // Add pattern for "10 APR 2026" format
+    private static final Pattern DATE_PATTERN_3 = Pattern.compile("\\d{1,2}\\s+(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)\\s+\\d{4}", Pattern.CASE_INSENSITIVE);
     private static final Pattern TOTAL_PATTERN = Pattern.compile("[\\$€£¥]?\\s*\\d{1,3}(,\\d{3})*(\\.\\d{2})");
     private static final Pattern UNWANTED_COMPANY_PATTERN = Pattern.compile("^(?!.*(RECEIPT|INVOICE|TAX|SUBTOTAL)).*$");
 
@@ -1033,11 +1035,19 @@ public class OcrService {
      * Extract date from a single line using regex patterns.
      */
     private String extractDateFromLine(String text) {
+        // Try "10 APR 2026" format first
+        Matcher matcher3 = DATE_PATTERN_3.matcher(text);
+        if (matcher3.find()) {
+            return matcher3.group().trim();
+        }
+        
+        // Try yyyy-MM-dd or yyyy/MM/dd format
         Matcher matcher1 = DATE_PATTERN_1.matcher(text);
         if (matcher1.find()) {
             return matcher1.group().trim();
         }
 
+        // Try dd-MM-yyyy, dd/MM/yyyy, yy-MM-dd, yy/MM/dd format
         Matcher matcher2 = DATE_PATTERN_2.matcher(text);
         if (matcher2.find()) {
             return matcher2.group().trim();
@@ -1111,7 +1121,14 @@ public class OcrService {
             DateTimeFormatter.ofPattern("yy-MM-dd"),
             DateTimeFormatter.ofPattern("yy/MM/dd"),
             DateTimeFormatter.ofPattern("MM-dd-yy"),
-            DateTimeFormatter.ofPattern("MM/dd/yy")
+            DateTimeFormatter.ofPattern("MM/dd/yy"),
+            // Add support for "10 APR 2026" format
+            DateTimeFormatter.ofPattern("dd MMM yyyy", java.util.Locale.ENGLISH),
+            DateTimeFormatter.ofPattern("d MMM yyyy", java.util.Locale.ENGLISH),
+            DateTimeFormatter.ofPattern("dd-MMM-yyyy", java.util.Locale.ENGLISH),
+            DateTimeFormatter.ofPattern("dd/MMM/yyyy", java.util.Locale.ENGLISH),
+            DateTimeFormatter.ofPattern("MMM dd, yyyy", java.util.Locale.ENGLISH),
+            DateTimeFormatter.ofPattern("MMM d, yyyy", java.util.Locale.ENGLISH)
         };
 
         for (DateTimeFormatter formatter : formatters) {
