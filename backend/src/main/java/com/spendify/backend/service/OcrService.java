@@ -1189,8 +1189,24 @@ public class OcrService {
                 String monthStr = parts[1];
                 int year = Integer.parseInt(parts[2]);
                 
-                java.time.Month month = java.time.Month.valueOf(monthStr);
-                return LocalDate.of(year, month.getValue(), day);
+                // Map month abbreviation to month number
+                int month = switch (monthStr) {
+                    case "JAN" -> 1;
+                    case "FEB" -> 2;
+                    case "MAR" -> 3;
+                    case "APR" -> 4;
+                    case "MAY" -> 5;
+                    case "JUN" -> 6;
+                    case "JUL" -> 7;
+                    case "AUG" -> 8;
+                    case "SEP" -> 9;
+                    case "OCT" -> 10;
+                    case "NOV" -> 11;
+                    case "DEC" -> 12;
+                    default -> throw new IllegalArgumentException("Invalid month: " + monthStr);
+                };
+                
+                return LocalDate.of(year, month, day);
             }
         } catch (Exception manualEx) {
             log.debug("Manual date parsing also failed: {}", manualEx.getMessage());
