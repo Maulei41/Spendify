@@ -31,8 +31,15 @@ jobs:
 
       - name: Install system dependencies (OpenCV, Tesseract)
         run: |
-          sudo apt-get update
-          sudo apt-get install -y libopencv-java tesseract-ocr tesseract-ocr-eng tesseract-ocr-chi-sim
+          # Check if OpenCV is already installed
+          if dpkg -l | grep -q "libopencv-java"; then
+            echo "OpenCV is already installed"
+          else
+            echo "OpenCV not found, installing..."
+            sudo apt-get update
+            sudo apt-get install -y libopencv-java tesseract-ocr tesseract-ocr-eng tesseract-ocr-chi-sim
+          fi
+          
           echo "OpenCV Java library location:"
           find /usr -name "libopencv_java*.so" 2>/dev/null | head -5
           echo "Tesseract traineddata locations:"
