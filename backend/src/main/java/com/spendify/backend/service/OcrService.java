@@ -110,23 +110,23 @@ public class OcrService {
     @PostConstruct
     private void initializeOnnxRuntime() {
         if (!onnxEnabled) {
-            log.info("ONNX pipeline 已禁用，将使用传统 Tesseract 方法");
+            log.info("ONNX pipeline is disabled; falling back to traditional Tesseract method");
             return;
         }
 
         try {
-            // 尝试加载 OpenCV native library
+            // Attempt to load OpenCV native library
             boolean opencvLoaded = false;
             try {
                 nu.pattern.OpenCV.loadLocally();
-                log.info("OpenCV 已初始化");
+                log.info("OpenCV initialized");
                 opencvLoaded = true;
             } catch (UnsatisfiedLinkError | Exception e) {
-                log.warn("OpenCV native library 加载失败: {}", e.getMessage());
-                // 继续尝试其他方法
+                log.warn("Failed to load OpenCV native library: {}", e.getMessage());
+                // Continue trying alternative methods
             }
 
-            // 方法 2: 直接加载 /usr/lib/jni/libopencv_java*.so
+            // Method 2: Manually load /usr/lib/jni/libopencv_java*.so
             if (!opencvLoaded) {
                 try {
                     Process process = Runtime.getRuntime().exec("find /usr/lib/jni -name 'libopencv_java*.so' 2>/dev/null");
@@ -134,73 +134,73 @@ public class OcrService {
                     String libPath = reader.readLine();
                     if (libPath != null) {
                         System.load(libPath);
-                        log.info("✅ OpenCV System.load() 成功：{}", libPath);
+                        log.info("✅ OpenCV System.load() successful: {}", libPath);
                         opencvLoaded = true;
                     }
                     reader.close();
                     process.destroy();
                 } catch (Exception e) {
-                    log.debug("OpenCV System.load() 失败：{}", e.getMessage());
+                    log.debug("OpenCV System.load() failed: {}", e.getMessage());
                 }
             }
-            
-            // 方法 3: 最后尝试 System.loadLibrary
+
+            // Method 3: Final attempt via System.loadLibrary
             if (!opencvLoaded) {
                 try {
                     System.loadLibrary("opencv_java");
-                    log.info("✅ OpenCV System.loadLibrary() 成功");
+                    log.info("✅ OpenCV System.loadLibrary() successful");
                     opencvLoaded = true;
                 } catch (UnsatisfiedLinkError e) {
-                    log.debug("OpenCV System.loadLibrary() 失败：{}", e.getMessage());
+                    log.debug("OpenCV System.loadLibrary() failed: {}", e.getMessage());
                 }
             }
 
-            // 如果所有 OpenCV 加载方法都失败
+            // If all OpenCV loading methods fail
             if (!opencvLoaded) {
-                log.warn("⚠️ OpenCV native library 加载失败，CTPN 文本检测将被禁用");
+                log.warn("⚠️ Failed to load OpenCV native library; CTPN text detection will be disabled");
                 ctpnAvailable = false;
             } else {
                 ctpnAvailable = true;
-                log.info("✅ OpenCV 已成功初始化");
+                log.info("✅ OpenCV initialized successfully");
             }
 
-            // 初始化 ONNX Runtime
+            // Initialize ONNX Runtime
             ortEnv = OrtEnvironment.getEnvironment();
             log.info("ONNX Runtime environment initialized");
 
-            // 只有在 OpenCV 可用时才加载 CTPN 模型
+            // Load CTPN model only if OpenCV is available
             if (ctpnAvailable) {
                 try {
                     ctpnSession = loadModel(ctpnModelPath, "CTPN");
-                    log.info("✅ CTPN 模型已加载：{}", ctpnModelPath);
+                    log.info("✅ CTPN model loaded: {}", ctpnModelPath);
                 } catch (Exception e) {
-                    log.warn("CTPN 模型加载失败：{}, CTPN 将被禁用", e.getMessage());
+                    log.warn("Failed to load CTPN model: {}, CTPN will be disabled", e.getMessage());
                     ctpnSession = null;
                     ctpnAvailable = false;
                 }
             } else {
                 ctpnSession = null;
-                log.info("CTPN 模型跳过加载（OpenCV 不可用）");
+                log.info("Skipping CTPN model loading (OpenCV unavailable)");
             }
 
-            // CharLM 不依赖 OpenCV，总是可以加载
+            // CharLM does not depend on OpenCV and can always be loaded
             try {
                 charlmSession = loadModel(charlmModelPath, "CharLM");
-                log.info("✅ CharLM 模型已加载：{}", charlmModelPath);
+                log.info("✅ CharLM model loaded: {}", charlmModelPath);
             } catch (Exception e) {
-                log.warn("CharLM 模型加载失败：{}, CharLM 将被禁用", e.getMessage());
+                log.warn("Failed to load CharLM model: {}, CharLM will be disabled", e.getMessage());
                 charlmSession = null;
             }
 
             log.info("========================================");
-            log.info("ONNX pipeline 初始化完成");
-            log.info("  - CTPN (文本检测): {}", ctpnAvailable ? "✅ 可用" : "❌ 不可用");
-            log.info("  - CharLM (字符识别): {}", charlmSession != null ? "✅ 可用" : "❌ 不可用");
+            log.info("ONNX pipeline initialization complete");
+            log.info("  - CTPN (Text Detection): {}", ctpnAvailable ? "✅ Available" : "❌ Unavailable");
+            log.info("  - CharLM (Character Recognition): {}", charlmSession != null ? "✅ Available" : "❌ Unavailable");
             log.info("========================================");
 
         } catch (Exception e) {
-            log.error("❌ ONNX pipeline 初始化失败：{}", e.getMessage(), e);
-            log.warn("将回退到传统 Tesseract 方法");
+            log.error("❌ ONNX pipeline initialization failed: {}", e.getMessage(), e);
+            log.warn("Falling back to traditional Tesseract method");
             onnxEnabled = false;
             ctpnAvailable = false;
             charlmSession = null;
@@ -208,32 +208,32 @@ public class OcrService {
     }
 
     /**
-     * 从 classpath 加载 ONNX 模型
+     * Loads an ONNX model from the classpath.
      */
     private OrtSession loadModel(String modelPath, String modelName) throws Exception {
-        // 从 classpath 加载模型
+        // Load model from classpath
         InputStream is = getClass().getClassLoader().getResourceAsStream(modelPath);
         if (is == null) {
-            throw new FileNotFoundException("找不到模型文件：" + modelPath);
+            throw new FileNotFoundException("Model file not found: " + modelPath);
         }
 
-        // 复制到临时文件
+        // Copy to a temporary file
         Path tempModel = Files.createTempFile(modelName.toLowerCase(), ".onnx");
         Files.copy(is, tempModel, StandardCopyOption.REPLACE_EXISTING);
         is.close();
 
-        // 创建 ONNX Session
+        // Create ONNX Session
         OrtSession.SessionOptions options = new OrtSession.SessionOptions();
         options.setOptimizationLevel(OrtSession.SessionOptions.OptLevel.ALL_OPT);
 
         OrtSession session = ortEnv.createSession(tempModel.toString(), options);
 
-        // 打印模型信息
-        log.info("  模型：{}", modelName);
-        log.info("  输入：{}", session.getInputNames());
-        log.info("  输出：{}", session.getOutputNames());
+        // Print model information
+        log.info("  Model: {}", modelName);
+        log.info("  Inputs: {}", session.getInputNames());
+        log.info("  Outputs: {}", session.getOutputNames());
 
-        // 删除临时文件
+        // Delete temporary file
         Files.delete(tempModel);
 
         return session;
@@ -271,19 +271,19 @@ public class OcrService {
 
             log.info("Processing image: {}x{} pixels, type: {}", image.getWidth(), image.getHeight(), image.getType());
 
-            // 尝试使用 ONNX pipeline
+            // Attempt to use ONNX pipeline
             if (onnxEnabled) {
                 try {
-                    log.info("使用 ONNX pipeline 进行 OCR 处理...");
+                    log.info("Processing OCR using ONNX pipeline...");
                     return processWithOnnxPipeline(file, image, ocrLog, startTime);
                 } catch (Exception onnxException) {
-                    log.error("ONNX pipeline 失败，回退到传统方法：{}", onnxException.getMessage(), onnxException);
-                    // 继续执行传统方法
+                    log.error("ONNX pipeline failed; falling back to traditional method: {}", onnxException.getMessage(), onnxException);
+                    // Continue to traditional method
                 }
             }
 
             // Fallback to traditional Tesseract method
-            log.info("使用传统 Tesseract 方法进行 OCR 处理...");
+            log.info("Processing OCR using traditional Tesseract method...");
             return processWithTraditionalMethod(file, image, ocrLog, startTime);
 
         } catch (Exception e) {
@@ -302,73 +302,73 @@ public class OcrService {
     }
 
     /**
-     * 使用 ONNX pipeline 处理 OCR（主要方法）
+     * Processes OCR using the ONNX pipeline (Main Method)
      * Pipeline: Image -> Crop Preprocessing -> CTPN -> Tesseract -> Text Post-processing -> CharLM -> Entity Matching
      */
-    private OcrResponse processWithOnnxPipeline(MultipartFile file, BufferedImage originalImage, 
-                                                  OcrProcessingLog ocrLog, long startTime) throws Exception {
-        
+    private OcrResponse processWithOnnxPipeline(MultipartFile file, BufferedImage originalImage,
+                                                OcrProcessingLog ocrLog, long startTime) throws Exception {
+
         BufferedImage processedImage = originalImage;
-        
-        // Step 1: Crop Preprocessing（裁剪预处理）- 仅在 CTPN 可用时执行
+
+        // Step 1: Crop Preprocessing - Only executed if CTPN is available
         if (ctpnAvailable) {
             try {
                 processedImage = cropPreprocessing(originalImage);
-                log.info("裁剪预处理完成：{}x{} pixels", processedImage.getWidth(), processedImage.getHeight());
+                log.info("Crop preprocessing complete: {}x{} pixels", processedImage.getWidth(), processedImage.getHeight());
             } catch (Exception e) {
-                log.warn("裁剪预处理失败，使用原始图像: {}", e.getMessage());
+                log.warn("Crop preprocessing failed; using original image: {}", e.getMessage());
                 processedImage = originalImage;
             }
         }
 
         List<String> textLines;
-        
-        // Step 2: CTPN 文本检测 或 全图 OCR
+
+        // Step 2: CTPN Text Detection or Full Image OCR
         if (ctpnAvailable) {
             try {
                 List<TextBox> textProposals = detectTextWithCTPN(processedImage);
-                log.info("CTPN 检测到 {} 个文本框", textProposals.size());
+                log.info("CTPN detected {} text boxes", textProposals.size());
 
-                // Step 3: 将文本框转换为图像区域用于 Tesseract
+                // Step 3: Convert text boxes into image regions for Tesseract
                 List<java.awt.Rectangle> textRegions = convertTextBoxesToRegions(textProposals);
 
-                // Step 4: Tesseract OCR 引擎
+                // Step 4: Tesseract OCR Engine
                 String extractedText = runTesseractOnRegions(processedImage, textRegions);
-                log.info("Tesseract 提取了 {} 个字符", extractedText.length());
+                log.info("Tesseract extracted {} characters", extractedText.length());
                 ocrLog.setDetectedText(extractedText);
 
-                // Step 5: 文本后处理
+                // Step 5: Text Post-processing
                 textLines = postprocessText(extractedText);
             } catch (Exception e) {
-                log.warn("CTPN 处理失败，回退到全图 OCR: {}", e.getMessage());
+                log.warn("CTPN processing failed; falling back to full image OCR: {}", e.getMessage());
                 String extractedText = runFullImageOCR(processedImage);
                 ocrLog.setDetectedText(extractedText);
                 textLines = Arrays.asList(extractedText.split("\n"));
             }
         } else {
-            // CTPN 不可用，直接使用全图 OCR
-            log.info("CTPN 不可用，使用全图 OCR");
+            // CTPN is unavailable; use full image OCR directly
+            log.info("CTPN is unavailable; using full image OCR");
             String extractedText = runFullImageOCR(processedImage);
             ocrLog.setDetectedText(extractedText);
             textLines = Arrays.asList(extractedText.split("\n"));
         }
 
-        log.info("文本后处理完成，共 {} 行", textLines.size());
+        log.info("Text post-processing complete; total lines: {}", textLines.size());
 
-        // Step 6: CharLM 信息提取（CharLM 不依赖 OpenCV，通常可用）
+        // Step 6: CharLM Information Extraction (CharLM does not depend on OpenCV and is usually available)
         Map<String, String> entities = new HashMap<>();
         if (charlmSession != null) {
             try {
                 entities = extractEntitiesWithCharLM(textLines);
-                log.info("CharLM 提取实体：{}", entities);
+                log.info("CharLM extracted entities: {}", entities);
             } catch (Exception e) {
-                log.warn("CharLM 提取失败，使用基于规则的方法: {}", e.getMessage());
+                log.warn("CharLM extraction failed; using rule-based fallback: {}", e.getMessage());
             }
         } else {
-            log.info("CharLM 不可用，使用基于规则的方法");
+            log.info("CharLM is unavailable; using rule-based method");
         }
 
-        // Step 7: 后处理和实体匹配
+        // Step 7: Post-processing and Entity Matching
         String company = entities.getOrDefault("company", "");
         String dateStr = entities.getOrDefault("date", "");
         String amountStr = entities.getOrDefault("total", "");
@@ -376,9 +376,9 @@ public class OcrService {
         LocalDate date = parseDate(dateStr);
         BigDecimal amount = parseAmount(amountStr);
 
-        // 如果 CharLM 未能提取某些实体，使用基于规则的后备方法
+        // If CharLM fails to extract certain entities, use rule-based fallback methods for completion
         if (company.isEmpty() || date == null || amount == null) {
-            log.info("CharLM 未能完整提取实体，使用基于规则的方法进行补充...");
+            log.info("CharLM failed to extract full entities; supplementing with rule-based methods...");
             if (company.isEmpty()) {
                 company = extractCompanyFromText(textLines);
             }
@@ -390,14 +390,14 @@ public class OcrService {
             }
         }
 
-        log.info("最终提取的实体：Company={}, Date={}, Amount={}", company, date, amount);
+        log.info("Final extracted entities: Company={}, Date={}, Amount={}", company, date, amount);
 
         long endTime = System.currentTimeMillis();
         ocrLog.setProcessingTimeMs(endTime - startTime);
         ocrLog.setSuccessful(true);
         ocrProcessingLogRepository.save(ocrLog);
 
-        // 构建响应
+        // Build response
         List<String> warnings = new ArrayList<>();
         if (company.isEmpty() || company.equals("Unknown")) {
             warnings.add("Merchant name not detected");
@@ -420,7 +420,6 @@ public class OcrService {
                 .requiresManualReview(warnings.size() > 1)
                 .build();
     }
-
     /**
      * 使用传统 Tesseract 方法处理 OCR（后备方法）
      */
@@ -484,46 +483,46 @@ public class OcrService {
                 .build();
     }
 
-    // ==================== ONNX Pipeline 方法 ====================
+    // ==================== ONNX Pipeline method ====================
 
     /**
-     * Step 1: Crop Preprocessing - 裁剪预处理（移除多余空白）
-     * 参考：split_labels.py 中的 crop_preprocessing 函数
+     * Step 1: Crop Preprocessing - Removes excess whitespace.
+     * Reference: crop_preprocessing function in split_labels.py
      */
     private BufferedImage cropPreprocessing(BufferedImage originalImage) throws IOException {
-        // 转换为 OpenCV Mat
+        // Convert to OpenCV Mat
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         ImageIO.write(originalImage, "png", baos);
         byte[] imageBytes = baos.toByteArray();
         Mat image = Imgcodecs.imdecode(new MatOfByte(imageBytes), Imgcodecs.IMREAD_COLOR);
 
         if (image.empty()) {
-            throw new IllegalArgumentException("无法解码输入图像");
+            throw new IllegalArgumentException("Unable to decode input image");
         }
 
         try {
-            // 1. 转换为灰度图
+            // 1. Convert to grayscale
             Mat gray = new Mat();
             Imgproc.cvtColor(image, gray, Imgproc.COLOR_BGR2GRAY);
 
-            // 2. Otsu 二值化
+            // 2. Otsu thresholding
             Mat threshed = new Mat();
             Imgproc.threshold(gray, threshed, 0, 255, Imgproc.THRESH_BINARY + Imgproc.THRESH_OTSU);
 
-            // 3. 形态学操作（腐蚀和膨胀）
+            // 3. Morphological operations (Erosion and Dilation)
             Mat kernel = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(3, 3));
             Mat eroded = new Mat();
             Mat dilated = new Mat();
             Imgproc.erode(threshed, eroded, kernel, new Point(-1, -1), 6);
             Imgproc.dilate(eroded, dilated, kernel, new Point(-1, -1), 6);
 
-            // 4. 查找轮廓并获取裁剪区域
+            // 4. Find contours and determine the cropping area
             List<MatOfPoint> contours = new ArrayList<>();
             Mat hierarchy = new Mat();
-            Imgproc.findContours(dilated, contours, hierarchy, Imgproc.RETR_EXTERNAL, 
+            Imgproc.findContours(dilated, contours, hierarchy, Imgproc.RETR_EXTERNAL,
                     Imgproc.CHAIN_APPROX_SIMPLE);
 
-            // 找到最大的轮廓（假设是主要内容区域）
+            // Find the largest contour (assumed to be the main content area)
             Rect boundingRect = null;
             double maxArea = 0;
             for (MatOfPoint contour : contours) {
@@ -535,7 +534,7 @@ public class OcrService {
                 }
             }
 
-            // 裁剪图像
+            // Crop the image
             Mat cropped;
             if (boundingRect != null && maxArea > image.cols() * image.rows() * 0.1) {
                 int x = Math.max(0, boundingRect.x);
@@ -543,19 +542,19 @@ public class OcrService {
                 int w = Math.min(image.cols() - x, boundingRect.width);
                 int h = Math.min(image.rows() - y, boundingRect.height);
                 cropped = new Mat(image, new Rect(x, y, w, h));
-                log.info("裁剪区域：x={}, y={}, w={}, h={}, area={}", x, y, w, h, maxArea);
+                log.info("Cropping region: x={}, y={}, w={}, h={}, area={}", x, y, w, h, maxArea);
             } else {
                 cropped = image.clone();
-                log.info("未找到有效裁剪区域，使用原图");
+                log.info("No valid cropping region found; using original image");
             }
 
-            // 转换回 BufferedImage
+            // Convert back to BufferedImage
             MatOfByte outputBuffer = new MatOfByte();
             Imgcodecs.imencode(".png", cropped, outputBuffer);
             ByteArrayInputStream bais = new ByteArrayInputStream(outputBuffer.toArray());
             BufferedImage croppedImage = ImageIO.read(bais);
 
-            // 清理资源
+            // Resource cleanup
             image.release(); gray.release(); threshed.release();
             eroded.release(); dilated.release(); kernel.release(); hierarchy.release();
             for (MatOfPoint contour : contours) contour.release();
@@ -564,23 +563,25 @@ public class OcrService {
             return croppedImage != null ? croppedImage : originalImage;
 
         } catch (Exception e) {
-            log.error("裁剪预处理失败：{}", e.getMessage(), e);
+            log.error("Crop preprocessing failed: {}", e.getMessage(), e);
             image.release();
             return originalImage;
         }
     }
 
     /**
-     * Step 2: CTPN 文本检测
+     * Step 2: CTPN Text Detection
      */
     private List<TextBox> detectTextWithCTPN(BufferedImage image) throws OrtException, IOException {
         if (ctpnSession == null) {
-            throw new IllegalStateException("CTPN 模型未加载");
+            throw new IllegalStateException("CTPN model not loaded");
         }
 
+        // Preprocess the image for CTPN (scaling, normalization, etc.)
         Mat preprocessedMat = preprocessImageForCTPN(image);
 
         try {
+            // Convert the Mat object to a flat float array for the tensor
             float[] imageData = matToFloatArray(preprocessedMat);
             long[] shape = {1, 3, preprocessedMat.rows(), preprocessedMat.cols()};
 
@@ -589,21 +590,22 @@ public class OcrService {
 
                 long startTime = System.currentTimeMillis();
                 try (OrtSession.Result results = ctpnSession.run(inputs)) {
-                    log.info("CTPN 推理耗时：{} ms", System.currentTimeMillis() - startTime);
+                    log.info("CTPN Inference duration: {} ms", System.currentTimeMillis() - startTime);
 
-                    // Handle potential 3D array output from ONNX model
+                    // Handle potential 3D array output from ONNX model (Batch size handling)
                     Object bboxObj = results.get(0).getValue();
                     Object scoreObj = results.get(1).getValue();
-                    
+
                     float[][] bboxPred;
                     float[][] scoreProb;
-                    
+
+                    // Flattening logic if the model returns [1, N, C] instead of [N, C]
                     if (bboxObj instanceof float[][][]) {
                         bboxPred = flattenFirstDimension((float[][][]) bboxObj);
                     } else {
                         bboxPred = (float[][]) bboxObj;
                     }
-                    
+
                     if (scoreObj instanceof float[][][]) {
                         scoreProb = flattenFirstDimension((float[][][]) scoreObj);
                     } else {
@@ -611,13 +613,18 @@ public class OcrService {
                     }
 
                     int imgH = preprocessedMat.rows(), imgW = preprocessedMat.cols();
+                    // Calculate feature map dimensions based on the stride
                     int featH = (int) Math.ceil((double) imgH / FEAT_STRIDE);
                     int featW = (int) Math.ceil((double) imgW / FEAT_STRIDE);
 
+                    // Generate base anchor boxes and decode model offsets into actual coordinates
                     float[][] anchors = generateAllAnchorBoxes(featH, featW);
                     float[][] decoded = decodeBboxes(bboxPred, anchors);
+
+                    // Ensure boxes stay within image boundaries
                     clipBboxes(decoded, imgW, imgH);
 
+                    // Filter proposals by confidence score
                     List<Integer> validIdx = new ArrayList<>();
                     for (int i = 0; i < scoreProb.length; i++) {
                         if (scoreProb[i][1] > TEXT_PROPOSAL_MIN_SCORE) validIdx.add(i);
@@ -631,11 +638,15 @@ public class OcrService {
                         validBboxes[i] = decoded[idx];
                     }
 
+                    // Apply Non-Maximum Suppression (NMS) to remove redundant overlapping boxes
                     List<Integer> nmsIdx = nms(validBboxes, validScores, NMS_IOU_THRESHOLD);
+
+                    // Connect the fine-grained text proposals into a full line of text
                     return connectTextProposals(validBboxes, validScores, nmsIdx, imgW, imgH);
                 }
             }
         } finally {
+            // Ensure memory is freed from the OpenCV Mat
             preprocessedMat.release();
         }
     }
@@ -789,54 +800,56 @@ public class OcrService {
 
     private String runTesseractOnRegions(BufferedImage image, List<java.awt.Rectangle> regions) throws Exception {
         if (regions.isEmpty()) {
-            log.info("区域列表为空，回退到全图 OCR");
+            log.info("Region list is empty, falling back to full-image OCR");
             return runFullImageOCR(image);
         }
-        
+
         StringBuilder sb = new StringBuilder();
         Tesseract tesseract = new Tesseract();
         tesseract.setDatapath(tesseractDataPath);
         tesseract.setLanguage(tesseractLanguage);
-        int ok = 0;
-        
-        log.info("开始在 {} 个区域上运行 Tesseract", regions.size());
-        
+        int successCount = 0;
+
+        log.info("Starting Tesseract on {} regions", regions.size());
+
         for (int i = 0; i < regions.size(); i++) {
             java.awt.Rectangle r = regions.get(i);
             try {
+                // Boundary checks to ensure the crop stays within image limits
                 int x = Math.max(0, r.x);
                 int y = Math.max(0, r.y);
                 int w = Math.min(r.width, image.getWidth() - x);
                 int h = Math.min(r.height, image.getHeight() - y);
-                
-                // 跳过太小的区域
+
+                // Skip regions that are too small to contain meaningful text
                 if (w < 10 || h < 10) {
-                    log.debug("跳过区域 {}: {}x{} (太小)", i, w, h);
+                    log.debug("Skipping region {}: {}x{} (Too small)", i, w, h);
                     continue;
                 }
-                
+
                 BufferedImage crop = image.getSubimage(x, y, w, h);
                 String text = tesseract.doOCR(crop);
-                log.debug("区域 {} ({}x{}): 提取 {} 个字符", i, w, h, text.length());
-                
-                if (!text.trim().isEmpty()) { 
-                    sb.append(text.trim()).append("\n"); 
-                    ok++; 
+                log.debug("Region {} ({}x{}): Extracted {} characters", i, w, h, text.length());
+
+                if (!text.trim().isEmpty()) {
+                    sb.append(text.trim()).append("\n");
+                    successCount++;
                 }
-            } catch (Exception e) { 
-                log.warn("Tesseract 处理区域 {} 失败：{}", i, e.getMessage()); 
+            } catch (Exception e) {
+                log.warn("Tesseract failed to process region {}: {}", i, e.getMessage());
             }
         }
-        
+
         String result = sb.toString().trim();
-        log.info("Tesseract 成功处理 {}/{} 个区域，共提取 {} 个字符", ok, regions.size(), result.length());
-        
-        // 如果提取的字符太少，回退到全图 OCR
+        log.info("Tesseract successfully processed {}/{} regions, total {} characters extracted",
+                successCount, regions.size(), result.length());
+
+        // Fallback logic: If extracted text is too short, the segmentation might have failed
         if (result.length() < 20) {
-            log.warn("提取的字符过少 ({}), 回退到全图 OCR", result.length());
+            log.warn("Extracted text is too short ({}), falling back to full-image OCR", result.length());
             return runFullImageOCR(image);
         }
-        
+
         return result;
     }
 
@@ -862,30 +875,39 @@ public class OcrService {
     private Map<String, String> extractEntitiesWithCharLM(List<String> textLines) {
         if (charlmSession == null || textLines.isEmpty()) return new HashMap<>();
         try {
+            // Concatenate lines into a single string for sequence processing
             String fullText = String.join(" ", textLines);
-            int maxLen = 512;
+            int maxLen = 512; // Maximum sequence length for the model
             int[] indices = new int[maxLen];
+
+            // Map characters to vocabulary indices (Character-level Tokenization)
             for (int i = 0; i < Math.min(fullText.length(), maxLen); i++) {
                 char c = Character.toUpperCase(fullText.charAt(i));
+                // Lookup character index; use 0 for Out-of-Vocabulary (OOV) characters
                 indices[i] = CHARLM_VOCAB.indexOf(c) >= 0 ? CHARLM_VOCAB.indexOf(c) + 1 : 0;
             }
+
             LongBuffer buf = LongBuffer.allocate(maxLen);
             for (int idx : indices) buf.put(idx);
             buf.rewind();
+
             try (OnnxTensor input = OnnxTensor.createTensor(ortEnv, buf, new long[]{1, maxLen})) {
                 long start = System.currentTimeMillis();
                 try (OrtSession.Result result = charlmSession.run(Collections.singletonMap("input_text", input))) {
-                    log.info("CharLM 推理耗时：{} ms", System.currentTimeMillis() - start);
+                    log.info("CharLM Inference duration: {} ms", System.currentTimeMillis() - start);
+
+                    // Expecting output shape: [batch_size, sequence_length, num_classes]
                     float[][][] pred = (float[][][]) result.get(0).getValue();
+
+                    // Decode prediction probabilities into structured entity tags
                     return decodeCharLMPredictions(fullText, pred, textLines);
                 }
             }
         } catch (Exception e) {
-            log.error("CharLM 提取失败", e);
+            log.error("CharLM extraction failed", e);
             return new HashMap<>();
         }
     }
-
     private Map<String, String> decodeCharLMPredictions(String text, float[][][] pred, List<String> textLines) {
         String[] cats = {"none", "company", "date", "address", "total"};
         Map<String, StringBuilder> builders = new HashMap<>();
@@ -909,7 +931,7 @@ public class OcrService {
         return res;
     }
 
-    // ==================== 辅助类 ====================
+    // ==================== helper class ====================
 
     public static class TextBox {
         private int x1, y1, x2, y2;
@@ -926,45 +948,45 @@ public class OcrService {
         public double getConfidence() { return confidence; }
         public void setConfidence(double confidence) { this.confidence = confidence; }
     }
-
-    // ==================== 实体提取方法 ====================
+// ==================== Entity Extraction Methods ====================
 
     /**
-     * 从文本行中提取公司名称（基于规则）
+     * Extracts the company name from text lines (Rule-based)
      */
     private String extractCompanyFromText(List<String> textLines) {
         return extractCompany(textLines);
     }
 
     /**
-     * 从文本行中提取日期（基于规则）
+     * Extracts the date from text lines (Rule-based)
      */
     private LocalDate extractDateFromText(List<String> textLines) {
-        log.info("开始在 {} 行文本中提取日期", textLines.size());
-        // 打印所有文本行用于调试
+        log.info("Starting date extraction across {} text lines", textLines.size());
+
+        // Print all text lines for debugging purposes
         for (int i = 0; i < textLines.size(); i++) {
-            log.info("文本行 [{}]: '{}'", i, textLines.get(i));
+            log.info("Line [{}]: '{}'", i, textLines.get(i));
         }
-        
+
         for (String line : textLines) {
             String dateStr = extractDateFromLine(line.trim());
             if (!dateStr.isEmpty()) {
-                log.info("找到日期字符串：'{}'", dateStr);
+                log.info("Date string found: '{}'", dateStr);
                 LocalDate parsed = parseDate(dateStr);
                 if (parsed != null) {
-                    log.info("日期解析成功：{} -> {}", dateStr, parsed);
+                    log.info("Date successfully parsed: {} -> {}", dateStr, parsed);
                     return parsed;
                 } else {
-                    log.warn("日期解析失败：{}", dateStr);
+                    log.warn("Failed to parse date: {}", dateStr);
                 }
             }
         }
-        log.warn("未能在文本中找到有效日期");
+        log.warn("No valid date found in the provided text");
         return null;
     }
 
     /**
-     * 从文本行中提取金额（基于规则）
+     * Extracts the amount from text lines (Rule-based)
      */
     private BigDecimal extractAmountFromText(List<String> textLines) {
         for (String line : textLines) {
