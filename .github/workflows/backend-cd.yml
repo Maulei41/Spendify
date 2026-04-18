@@ -29,15 +29,35 @@ jobs:
       - name: Grant execute permissions to mvnw
         run: chmod +x mvnw
 
+      - name: Install system dependencies (OpenCV, Tesseract)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libopencv-java tesseract-ocr tesseract-ocr-eng tesseract-ocr-chi-sim
+          echo "OpenCV Java library location:"
+          find /usr -name "libopencv_java*.so" 2>/dev/null | head -5
+          echo "Tesseract traineddata locations:"
+          find /usr/share/tesseract-ocr -name "*.traineddata" 2>/dev/null
+
       - name: Setup tessdata directory for application
         run: |
           mkdir -p ~/spendify/tessdata
+          # Copy English traineddata
           ENG_PATH=$(find /usr/share/tesseract-ocr -name "eng.traineddata" 2>/dev/null | head -1)
           if [ -n "$ENG_PATH" ]; then
             cp "$ENG_PATH" ~/spendify/tessdata/eng.traineddata
             echo "Copied eng.traineddata from system"
           else
-            echo "WARNING: eng.traineddata not found on system"
+            wget -O ~/spendify/tessdata/eng.traineddata https://github.com/tesseract-ocr/tessdata/raw/main/eng.traineddata
+            echo "Downloaded eng.traineddata from GitHub"
+          fi
+          # Copy Chinese Simplified traineddata
+          CHI_PATH=$(find /usr/share/tesseract-ocr -name "chi_sim.traineddata" 2>/dev/null | head -1)
+          if [ -n "$CHI_PATH" ]; then
+            cp "$CHI_PATH" ~/spendify/tessdata/chi_sim.traineddata
+            echo "Copied chi_sim.traineddata from system"
+          else
+            wget -O ~/spendify/tessdata/chi_sim.traineddata https://github.com/tesseract-ocr/tessdata/raw/main/chi_sim.traineddata
+            echo "Downloaded chi_sim.traineddata from GitHub"
           fi
           echo "Contents of ~/spendify/tessdata:"
           ls -la ~/spendify/tessdata/
