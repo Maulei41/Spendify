@@ -122,40 +122,84 @@ public class OcrService {
                 // 继续尝试其他方法
             }
 
-            // 如果 OpenCV 加载失败，但 ONNX 仍可工作（对于 CharLM）
-            // 我们可以只禁用 CTPN 部分，保留 CharLM
+            // 方法 2: 直接加载 /usr/lib/jni/libopencv_java*.so
             if (!opencvLoaded) {
-                log.warn("OpenCV 不可用，CTPN 文本检测将被禁用，但 CharLM 仍可使用");
-                // 设置标志表示 CTPN 不可用
+                try {
+                    Process process = Runtime.getRuntime().exec("find /usr/lib/jni -name 'libopencv_java*.so' 2>/dev/null");
+                    BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+                    String libPath = reader.readLine();
+                    if (libPath != null) {
+                        System.load(libPath);
+                        log.info("✅ OpenCV System.load() 成功：{}", libPath);
+                        opencvLoaded = true;
+                    }
+                    reader.close();
+                    process.destroy();
+                } catch (Exception e) {
+                    log.debug("OpenCV System.load() 失败：{}", e.getMessage());
+                }
+            }
+            
+            // 方法 3: 最后尝试 System.loadLibrary
+            if (!opencvLoaded) {
+                try {
+                    System.loadLibrary("opencv_java");
+                    log.info("✅ OpenCV System.loadLibrary() 成功");
+                    opencvLoaded = true;
+                } catch (UnsatisfiedLinkError e) {
+                    log.debug("OpenCV System.loadLibrary() 失败：{}", e.getMessage());
+                }
+            }
+
+            // 如果所有 OpenCV 加载方法都失败
+            if (!opencvLoaded) {
+                log.warn("⚠️ OpenCV native library 加载失败，CTPN 文本检测将被禁用");
                 ctpnAvailable = false;
             } else {
                 ctpnAvailable = true;
+                log.info("✅ OpenCV 已成功初始化");
             }
 
             // 初始化 ONNX Runtime
             ortEnv = OrtEnvironment.getEnvironment();
+            log.info("ONNX Runtime environment initialized");
 
             // 只有在 OpenCV 可用时才加载 CTPN 模型
             if (ctpnAvailable) {
-                ctpnSession = loadModel(ctpnModelPath, "CTPN");
-                log.info("CTPN 模型已加载");
+                try {
+                    ctpnSession = loadModel(ctpnModelPath, "CTPN");
+                    log.info("✅ CTPN 模型已加载：{}", ctpnModelPath);
+                } catch (Exception e) {
+                    log.warn("CTPN 模型加载失败：{}, CTPN 将被禁用", e.getMessage());
+                    ctpnSession = null;
+                    ctpnAvailable = false;
+                }
             } else {
                 ctpnSession = null;
                 log.info("CTPN 模型跳过加载（OpenCV 不可用）");
             }
 
             // CharLM 不依赖 OpenCV，总是可以加载
-            charlmSession = loadModel(charlmModelPath, "CharLM");
-            log.info("CharLM 模型已加载");
+            try {
+                charlmSession = loadModel(charlmModelPath, "CharLM");
+                log.info("✅ CharLM 模型已加载：{}", charlmModelPath);
+            } catch (Exception e) {
+                log.warn("CharLM 模型加载失败：{}, CharLM 将被禁用", e.getMessage());
+                charlmSession = null;
+            }
 
-            log.info("✅ ONNX pipeline 初始化完成 (CTPN: {}, CharLM: {})", 
-                    ctpnAvailable ? "可用" : "不可用", "可用");
+            log.info("========================================");
+            log.info("ONNX pipeline 初始化完成");
+            log.info("  - CTPN (文本检测): {}", ctpnAvailable ? "✅ 可用" : "❌ 不可用");
+            log.info("  - CharLM (字符识别): {}", charlmSession != null ? "✅ 可用" : "❌ 不可用");
+            log.info("========================================");
 
         } catch (Exception e) {
             log.error("❌ ONNX pipeline 初始化失败：{}", e.getMessage(), e);
             log.warn("将回退到传统 Tesseract 方法");
             onnxEnabled = false;
             ctpnAvailable = false;
+            charlmSession = null;
         }
     }
 
