@@ -72,8 +72,8 @@ public class OcrService {
     private static final float MIN_SIZE_SIM = 0.8f;
     private static final int MAX_HORIZONTAL_GAP = 50;
 
-    // CharLM 词汇表
-    private static final String CHARLM_VOCAB = " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    // CharLM 词汇表 - 添加小写字母以支持日期月份
+    private static final String CHARLM_VOCAB = " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
 
     private final OcrProcessingLogRepository ocrProcessingLogRepository;
 
@@ -1146,6 +1146,7 @@ public class OcrService {
         }
         log.info("Parsing date: '{}' -> '{}' chars: {}", dateStr, cleanedDate, debugInfo.toString());
 
+        // Try parsing with English locale for month names
         DateTimeFormatter[] formatters = {
             DateTimeFormatter.ofPattern("yyyy-MM-dd"),
             DateTimeFormatter.ofPattern("yyyy/MM/dd"),
@@ -1155,13 +1156,16 @@ public class OcrService {
             DateTimeFormatter.ofPattern("yy/MM/dd"),
             DateTimeFormatter.ofPattern("MM-dd-yy"),
             DateTimeFormatter.ofPattern("MM/dd/yy"),
-            // Add support for "10 APR 2026" format
+            // Add support for "10 APR 2026" format - try with lenient parsing
             DateTimeFormatter.ofPattern("dd MMM yyyy", java.util.Locale.ENGLISH),
             DateTimeFormatter.ofPattern("d MMM yyyy", java.util.Locale.ENGLISH),
             DateTimeFormatter.ofPattern("dd-MMM-yyyy", java.util.Locale.ENGLISH),
             DateTimeFormatter.ofPattern("dd/MMM/yyyy", java.util.Locale.ENGLISH),
             DateTimeFormatter.ofPattern("MMM dd, yyyy", java.util.Locale.ENGLISH),
-            DateTimeFormatter.ofPattern("MMM d, yyyy", java.util.Locale.ENGLISH)
+            DateTimeFormatter.ofPattern("MMM d, yyyy", java.util.Locale.ENGLISH),
+            // Additional formats
+            DateTimeFormatter.ofPattern("dd MMMM yyyy", java.util.Locale.ENGLISH),
+            DateTimeFormatter.ofPattern("d MMMM yyyy", java.util.Locale.ENGLISH)
         };
 
         for (DateTimeFormatter formatter : formatters) {
@@ -1174,7 +1178,24 @@ public class OcrService {
             }
         }
 
+        // Last resort: try with custom parsing
         log.warn("Could not parse date: {} (tried {} formatters)", dateStr, formatters.length);
+        
+        // Try manual parsing for "DD MMM YYYY" format
+        try {
+            String[] parts = cleanedDate.split("\\s+");
+            if (parts.length >= 3) {
+                int day = Integer.parseInt(parts[0]);
+                String monthStr = parts[1];
+                int year = Integer.parseInt(parts[2]);
+                
+                java.time.Month month = java.time.Month.valueOf(monthStr);
+                return LocalDate.of(year, month.getValue(), day);
+            }
+        } catch (Exception manualEx) {
+            log.debug("Manual date parsing also failed: {}", manualEx.getMessage());
+        }
+        
         return null;
     }
 
