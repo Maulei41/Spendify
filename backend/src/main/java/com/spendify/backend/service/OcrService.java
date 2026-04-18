@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
+import jakarta.annotation.PostConstruct;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
@@ -83,7 +84,7 @@ public class OcrService {
     @Autowired
     public OcrService(OcrProcessingLogRepository ocrProcessingLogRepository) {
         this.ocrProcessingLogRepository = ocrProcessingLogRepository;
-        initializeOnnxRuntime();
+        // Initialization moved to @PostConstruct to ensure @Value injection is complete
     }
 
     @Value("${tesseract.data.path:tessdata}")
@@ -102,8 +103,9 @@ public class OcrService {
     private boolean onnxEnabled;
 
     /**
-     * 初始化 ONNX Runtime 环境
+     * Initialize ONNX Runtime environment after dependency injection is complete
      */
+    @PostConstruct
     private void initializeOnnxRuntime() {
         if (!onnxEnabled) {
             log.info("ONNX pipeline 已禁用，将使用传统 Tesseract 方法");
