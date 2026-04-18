@@ -1049,24 +1049,33 @@ public class OcrService {
      * Extract date from a single line using regex patterns.
      */
     private String extractDateFromLine(String text) {
+        log.debug("extractDateFromLine input: '{}'", text);
+        
         // Try "10 APR 2026" format first
         Matcher matcher3 = DATE_PATTERN_3.matcher(text);
         if (matcher3.find()) {
-            return matcher3.group().trim();
+            String matched = matcher3.group().trim();
+            log.debug("DATE_PATTERN_3 matched: '{}'", matched);
+            return matched;
         }
-        
+
         // Try yyyy-MM-dd or yyyy/MM/dd format
         Matcher matcher1 = DATE_PATTERN_1.matcher(text);
         if (matcher1.find()) {
-            return matcher1.group().trim();
+            String matched = matcher1.group().trim();
+            log.debug("DATE_PATTERN_1 matched: '{}'", matched);
+            return matched;
         }
 
         // Try dd-MM-yyyy, dd/MM/yyyy, yy-MM-dd, yy/MM/dd format
         Matcher matcher2 = DATE_PATTERN_2.matcher(text);
         if (matcher2.find()) {
-            return matcher2.group().trim();
+            String matched = matcher2.group().trim();
+            log.debug("DATE_PATTERN_2 matched: '{}'", matched);
+            return matched;
         }
 
+        log.debug("No date pattern matched");
         return "";
     }
 
@@ -1129,7 +1138,13 @@ public class OcrService {
 
         // Clean the date string - remove extra spaces and normalize
         String cleanedDate = dateStr.trim().replaceAll("\\s+", " ").toUpperCase();
-        log.info("Parsing date: '{}' -> '{}'", dateStr, cleanedDate);
+        
+        // Debug: print each character's code
+        StringBuilder debugInfo = new StringBuilder();
+        for (char c : cleanedDate.toCharArray()) {
+            debugInfo.append(String.format("%c(%d) ", c, (int) c));
+        }
+        log.info("Parsing date: '{}' -> '{}' chars: {}", dateStr, cleanedDate, debugInfo.toString());
 
         DateTimeFormatter[] formatters = {
             DateTimeFormatter.ofPattern("yyyy-MM-dd"),
