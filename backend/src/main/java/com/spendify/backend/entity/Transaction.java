@@ -18,7 +18,7 @@ import java.time.LocalDateTime;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@SQLDelete(sql = "UPDATE transactions SET is_deleted = true, deleted_date = GETDATE() WHERE id = ?")
+@SQLDelete(sql = "UPDATE transactions SET is_deleted = true, deleted_date = CURRENT_TIMESTAMP WHERE id = ?")
 @Where(clause = "is_deleted = false")
 public class Transaction {
 
