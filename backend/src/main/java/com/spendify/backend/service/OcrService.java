@@ -1113,6 +1113,10 @@ public class OcrService {
             return null;
         }
 
+        // Clean the date string - remove extra spaces and normalize
+        String cleanedDate = dateStr.trim().replaceAll("\\s+", " ").toUpperCase();
+        log.debug("Parsing date: '{}' -> '{}'", dateStr, cleanedDate);
+
         DateTimeFormatter[] formatters = {
             DateTimeFormatter.ofPattern("yyyy-MM-dd"),
             DateTimeFormatter.ofPattern("yyyy/MM/dd"),
@@ -1133,7 +1137,7 @@ public class OcrService {
 
         for (DateTimeFormatter formatter : formatters) {
             try {
-                return LocalDate.parse(dateStr, formatter);
+                return LocalDate.parse(cleanedDate, formatter);
             } catch (DateTimeParseException e) {
                 // Try next formatter
             }
