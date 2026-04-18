@@ -589,8 +589,24 @@ public class OcrService {
                 try (OrtSession.Result results = ctpnSession.run(inputs)) {
                     log.info("CTPN 推理耗时：{} ms", System.currentTimeMillis() - startTime);
 
-                    float[][] bboxPred = (float[][]) results.get(0).getValue();
-                    float[][] scoreProb = (float[][]) results.get(1).getValue();
+                    // Handle potential 3D array output from ONNX model
+                    Object bboxObj = results.get(0).getValue();
+                    Object scoreObj = results.get(1).getValue();
+                    
+                    float[][] bboxPred;
+                    float[][] scoreProb;
+                    
+                    if (bboxObj instanceof float[][][]) {
+                        bboxPred = flattenFirstDimension((float[][][]) bboxObj);
+                    } else {
+                        bboxPred = (float[][]) bboxObj;
+                    }
+                    
+                    if (scoreObj instanceof float[][][]) {
+                        scoreProb = flattenFirstDimension((float[][][]) scoreObj);
+                    } else {
+                        scoreProb = (float[][]) scoreObj;
+                    }
 
                     int imgH = preprocessedMat.rows(), imgW = preprocessedMat.cols();
                     int featH = (int) Math.ceil((double) imgH / FEAT_STRIDE);
@@ -620,6 +636,26 @@ public class OcrService {
         } finally {
             preprocessedMat.release();
         }
+    }
+
+    /**
+     * Flatten 3D float array to 2D by merging first two dimensions
+     */
+    private float[][] flattenFirstDimension(float[][][] array3d) {
+        if (array3d.length == 0) {
+            return new float[0][0];
+        }
+        int dim1 = array3d.length;
+        int dim2 = array3d[0].length;
+        int dim3 = array3d[0][0].length;
+        
+        float[][] result = new float[dim1 * dim2][dim3];
+        for (int i = 0; i < dim1; i++) {
+            for (int j = 0; j < dim2; j++) {
+                result[i * dim2 + j] = array3d[i][j];
+            }
+        }
+        return result;
     }
 
     private Mat preprocessImageForCTPN(BufferedImage image) throws IOException {
