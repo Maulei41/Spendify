@@ -940,12 +940,26 @@ public class OcrService {
      * 从文本行中提取日期（基于规则）
      */
     private LocalDate extractDateFromText(List<String> textLines) {
+        log.info("开始在 {} 行文本中提取日期", textLines.size());
+        // 打印所有文本行用于调试
+        for (int i = 0; i < textLines.size(); i++) {
+            log.info("文本行 [{}]: '{}'", i, textLines.get(i));
+        }
+        
         for (String line : textLines) {
             String dateStr = extractDateFromLine(line.trim());
             if (!dateStr.isEmpty()) {
-                return parseDate(dateStr);
+                log.info("找到日期字符串：'{}'", dateStr);
+                LocalDate parsed = parseDate(dateStr);
+                if (parsed != null) {
+                    log.info("日期解析成功：{} -> {}", dateStr, parsed);
+                    return parsed;
+                } else {
+                    log.warn("日期解析失败：{}", dateStr);
+                }
             }
         }
+        log.warn("未能在文本中找到有效日期");
         return null;
     }
 
@@ -1115,7 +1129,7 @@ public class OcrService {
 
         // Clean the date string - remove extra spaces and normalize
         String cleanedDate = dateStr.trim().replaceAll("\\s+", " ").toUpperCase();
-        log.debug("Parsing date: '{}' -> '{}'", dateStr, cleanedDate);
+        log.info("Parsing date: '{}' -> '{}'", dateStr, cleanedDate);
 
         DateTimeFormatter[] formatters = {
             DateTimeFormatter.ofPattern("yyyy-MM-dd"),
@@ -1137,13 +1151,15 @@ public class OcrService {
 
         for (DateTimeFormatter formatter : formatters) {
             try {
-                return LocalDate.parse(cleanedDate, formatter);
+                LocalDate parsed = LocalDate.parse(cleanedDate, formatter);
+                log.info("Successfully parsed date '{}' with pattern '{}'", cleanedDate, formatter);
+                return parsed;
             } catch (DateTimeParseException e) {
-                // Try next formatter
+                log.debug("Failed to parse '{}' with pattern '{}': {}", cleanedDate, formatter, e.getMessage());
             }
         }
 
-        log.warn("Could not parse date: {}", dateStr);
+        log.warn("Could not parse date: {} (tried {} formatters)", dateStr, formatters.length);
         return null;
     }
 
