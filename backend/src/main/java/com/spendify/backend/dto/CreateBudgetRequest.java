@@ -16,7 +16,7 @@ import java.math.BigDecimal;
 public class CreateBudgetRequest {
 
     @NotNull(message = "Limit is required")
-    @DecimalMin(value = "5000", message = "Limit must be at least 5,000")
+    @DecimalMin(value = "0", message = "Limit must be at least 0")
     private BigDecimal limit;
 
     @NotNull(message = "YearMonth is required")
